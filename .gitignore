@@ -1,0 +1,48 @@
+# WordPress
+wp-config.php
+wp-content/uploads/
+wp-content/blogs.dir/
+wp-content/upgrade/
+wp-content/backup-db/
+wp-content/advanced-cache.php
+wp-content/wp-cache-config.php
+wp-content/cache/
+wp-content/cache/supercache/
+
+# WordPress multisite
+.htaccess
+sitemap.xml
+sitemap.xml.gz
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Node modules (if using build tools)
+node_modules/
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+
+# Distribution zip (keep source files only)
+*.zip
+
+# PHP temporary files
+.phpunit.result.cache
