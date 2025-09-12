@@ -46,3 +46,6 @@ npm-debug.log*
 
 # PHP temporary files
 .phpunit.result.cache
+
+# Submission guide (local only)
+SUBMISSION_GUIDE.md
