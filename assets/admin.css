@@ -1,0 +1,291 @@
+/**
+ * ChatMaxima Admin Styles
+ */
+
+/* Settings page wrapper */
+.chatmaxima-settings-wrap {
+    max-width: 900px;
+}
+
+/* Card style for sections */
+.chatmaxima-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.chatmaxima-card h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.chatmaxima-card h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+/* Connection status */
+.chatmaxima-status {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.chatmaxima-status.connected {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.chatmaxima-status.disconnected {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.chatmaxima-status .status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.chatmaxima-status.connected .status-indicator {
+    background: #28a745;
+}
+
+.chatmaxima-status.disconnected .status-indicator {
+    background: #dc3545;
+}
+
+.chatmaxima-status .status-text {
+    font-weight: 500;
+}
+
+/* Login form */
+.chatmaxima-login-form {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+
+.chatmaxima-login-form .form-table th {
+    width: 100px;
+    padding: 10px 10px 10px 0;
+}
+
+.chatmaxima-login-form .form-table td {
+    padding: 10px 0;
+}
+
+/* Messages */
+.chatmaxima-message {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.chatmaxima-message.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.chatmaxima-message.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Knowledge source creation */
+.chatmaxima-create-ks {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+/* Progress bar */
+.chatmaxima-progress {
+    margin: 20px 0;
+}
+
+.chatmaxima-progress .progress-bar {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.chatmaxima-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    transition: width 0.3s ease;
+}
+
+.chatmaxima-progress .progress-text {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #666;
+}
+
+.chatmaxima-progress .progress-count {
+    font-weight: 600;
+}
+
+/* Sync actions */
+.chatmaxima-sync-actions {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+/* Social media table */
+.chatmaxima-social-table {
+    margin: 0;
+}
+
+.chatmaxima-social-table td {
+    vertical-align: middle;
+}
+
+/* Buttons */
+.chatmaxima-card .button {
+    margin-right: 5px;
+}
+
+/* Form tables inside cards */
+.chatmaxima-card .form-table {
+    margin: 0;
+}
+
+.chatmaxima-card .form-table th {
+    padding: 15px 10px 15px 0;
+    width: 200px;
+}
+
+.chatmaxima-card .form-table td {
+    padding: 15px 0;
+}
+
+/* Post type checkboxes */
+.chatmaxima-card input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .chatmaxima-card .form-table th,
+    .chatmaxima-card .form-table td {
+        display: block;
+        width: 100%;
+        padding: 10px 0;
+    }
+
+    .chatmaxima-card .form-table th {
+        padding-bottom: 5px;
+    }
+
+    .chatmaxima-status {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .chatmaxima-status .status-indicator {
+        margin-bottom: 5px;
+    }
+}
+
+/* Meta box styles */
+.chatmaxima-sync-meta-box {
+    padding: 5px 0;
+}
+
+.chatmaxima-sync-meta-box .chatmaxima-sync-status {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.chatmaxima-sync-meta-box .status-synced {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.chatmaxima-sync-meta-box .status-error {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.chatmaxima-sync-meta-box .status-pending {
+    color: #6c757d;
+}
+
+.chatmaxima-sync-meta-box .error-message {
+    color: #dc3545;
+    font-style: italic;
+}
+
+/* Column in posts list */
+.column-chatmaxima_sync {
+    width: 100px;
+}
+
+/* Tooltip */
+.chatmaxima-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+}
+
+.chatmaxima-tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 4px;
+    padding: 8px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 12px;
+}
+
+.chatmaxima-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Loading state */
+.chatmaxima-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Spinner */
+.chatmaxima-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: chatmaxima-spin 1s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+@keyframes chatmaxima-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
