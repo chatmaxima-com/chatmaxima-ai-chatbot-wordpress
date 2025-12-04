@@ -507,4 +507,59 @@ class ChatMaxima_API_Client
     {
         return get_option('chatmaxima_selected_team', '');
     }
+
+    /**
+     * List all channels/accounts
+     * @param string $platform Optional platform filter (web, whatsapp, instagram, facebook, telegram, ticket)
+     * @param string $status Optional status filter (Y = active, N = inactive)
+     */
+    public function list_channels($platform = null, $status = 'Y')
+    {
+        $body = [];
+
+        if ($platform)
+        {
+            $body['platform'] = $platform;
+        }
+
+        if ($status)
+        {
+            $body['status'] = $status;
+        }
+
+        $response = $this->make_request('channels/', 'POST', $body);
+
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        if (isset($response['status']) && $response['status'] === 'success')
+        {
+            return $response['data'];
+        }
+
+        $error_message = isset($response['error']['message']) ? $response['error']['message'] : 'Failed to fetch channels';
+        return new WP_Error('fetch_failed', $error_message);
+    }
+
+    /**
+     * Get single channel by alias
+     */
+    public function get_channel($alias)
+    {
+        $response = $this->make_request('channels/' . $alias . '/', 'GET');
+
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        if (isset($response['status']) && $response['status'] === 'success')
+        {
+            return $response['data'];
+        }
+
+        return new WP_Error('fetch_failed', 'Failed to fetch channel');
+    }
 }

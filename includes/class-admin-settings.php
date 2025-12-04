@@ -35,6 +35,10 @@ class ChatMaxima_Admin_Settings
         add_action('wp_ajax_chatmaxima_save_ks_selection', [$this, 'ajax_save_ks_selection']);
         add_action('wp_ajax_chatmaxima_get_teams', [$this, 'ajax_get_teams']);
         add_action('wp_ajax_chatmaxima_switch_team', [$this, 'ajax_switch_team']);
+        add_action('wp_ajax_chatmaxima_get_channels', [$this, 'ajax_get_channels']);
+        add_action('wp_ajax_chatmaxima_save_channel_selection', [$this, 'ajax_save_channel_selection']);
+        add_action('wp_ajax_chatmaxima_install_widget', [$this, 'ajax_install_widget']);
+        add_action('wp_ajax_chatmaxima_uninstall_widget', [$this, 'ajax_uninstall_widget']);
     }
 
     /**
@@ -475,32 +479,61 @@ class ChatMaxima_Admin_Settings
             </div>
             <?php endif; ?>
 
-            <!-- Chatbot Settings -->
+            <?php if ($is_authenticated): ?>
+            <?php
+            $installed_channel = get_option('chatmaxima_installed_channel', '');
+            $is_widget_installed = !empty($installed_channel);
+            ?>
+            <!-- Web Channels Section -->
             <div class="chatmaxima-card">
-                <h2><?php _e('Chatbot Widget Settings', 'chatmaxima-ai-chatbot'); ?></h2>
-                <form action="options.php" method="post">
-                    <?php
-                    settings_fields('chatmaxima_settings');
+                <h2><?php _e('Chatbot Widget', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php _e('Select a web channel and install the chatbot widget on your WordPress site.', 'chatmaxima-ai-chatbot'); ?></p>
 
-                    // Token ID
-                    $this->token_id_render();
+                <table class="form-table">
+                    <tr>
+                        <th><label for="chatmaxima_channel"><?php _e('Channel', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <td>
+                            <select id="chatmaxima_channel" class="regular-text">
+                                <option value=""><?php _e('-- Loading channels... --', 'chatmaxima-ai-chatbot'); ?></option>
+                            </select>
+                            <button type="button" id="chatmaxima-refresh-channels-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
+                            <span id="chatmaxima-channel-message" class="chatmaxima-message"></span>
+                            <p class="description"><?php _e('Select the web channel to embed on your WordPress site.', 'chatmaxima-ai-chatbot'); ?></p>
+                        </td>
+                    </tr>
+                </table>
 
-                    echo '<br/><br/>';
+                <!-- Widget Script Preview -->
+                <div id="chatmaxima-widget-script" style="display: none; margin-top: 20px;">
+                    <h3><?php _e('Widget Script', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <p class="description"><?php _e('This script will be automatically added to your website footer when installed.', 'chatmaxima-ai-chatbot'); ?></p>
+                    <div style="position: relative;">
+                        <pre id="chatmaxima-script-code" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 13px;"></pre>
+                        <button type="button" id="chatmaxima-copy-script-btn" class="button" style="position: absolute; top: 10px; right: 10px;"><?php _e('Copy', 'chatmaxima-ai-chatbot'); ?></button>
+                    </div>
 
-                    // Theme Color
-                    echo '<label for="chatmaxima_theme_color"><strong>' . __('Theme Color', 'chatmaxima-ai-chatbot') . '</strong></label><br/>';
-                    $this->theme_color_render();
+                    <div style="margin-top: 15px;">
+                        <button type="button" id="chatmaxima-install-widget-btn" class="button button-primary button-hero" <?php echo $is_widget_installed ? 'style="display:none;"' : ''; ?>>
+                            <?php _e('Install Widget', 'chatmaxima-ai-chatbot'); ?>
+                        </button>
+                        <button type="button" id="chatmaxima-uninstall-widget-btn" class="button button-secondary" <?php echo !$is_widget_installed ? 'style="display:none;"' : ''; ?>>
+                            <?php _e('Uninstall Widget', 'chatmaxima-ai-chatbot'); ?>
+                        </button>
+                        <span id="chatmaxima-install-message" class="chatmaxima-message" style="margin-left: 10px;"></span>
+                    </div>
 
-                    echo '<br/><br/>';
-
-                    // Social Media
-                    echo '<label><strong>' . __('Social Media Details', 'chatmaxima-ai-chatbot') . '</strong></label><br/>';
-                    $this->social_media_render();
-
-                    submit_button();
-                    ?>
-                </form>
+                    <?php if ($is_widget_installed): ?>
+                    <div id="chatmaxima-widget-status" style="margin-top: 15px; padding: 10px 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
+                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is installed and active on your site.', 'chatmaxima-ai-chatbot'); ?>
+                    </div>
+                    <?php else: ?>
+                    <div id="chatmaxima-widget-status" style="display: none; margin-top: 15px; padding: 10px 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
+                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is installed and active on your site.', 'chatmaxima-ai-chatbot'); ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
             </div>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -985,6 +1018,120 @@ class ChatMaxima_Admin_Settings
         wp_send_json_success([
             'message' => __('Team switched successfully', 'chatmaxima-ai-chatbot'),
             'team' => isset($result['team']) ? $result['team'] : null
+        ]);
+    }
+
+    /**
+     * AJAX: Get channels (web platform only for chatbot widget)
+     */
+    public function ajax_get_channels()
+    {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'chatmaxima_admin_nonce'))
+        {
+            wp_send_json_error(['message' => __('Security check failed. Please refresh the page and try again.', 'chatmaxima-ai-chatbot')]);
+            return;
+        }
+
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
+            return;
+        }
+
+        // Check if authenticated first
+        if (!$this->api_client->is_authenticated())
+        {
+            wp_send_json_error(['message' => __('Not authenticated. Please login first.', 'chatmaxima-ai-chatbot')]);
+            return;
+        }
+
+        // Get platform filter from request (default to 'livechatwidget' for chatbot widget)
+        $platform = isset($_POST['platform']) ? sanitize_text_field($_POST['platform']) : 'livechatwidget';
+
+        $result = $this->api_client->list_channels($platform, 'Y');
+
+        if (is_wp_error($result))
+        {
+            wp_send_json_error(['message' => $result->get_error_message()]);
+            return;
+        }
+
+        $selected = get_option('chatmaxima_channel_alias', '');
+
+        wp_send_json_success([
+            'channels' => isset($result['channels']) ? $result['channels'] : [],
+            'total_count' => isset($result['total_count']) ? $result['total_count'] : 0,
+            'selected' => $selected
+        ]);
+    }
+
+    /**
+     * AJAX: Save channel selection
+     */
+    public function ajax_save_channel_selection()
+    {
+        check_ajax_referer('chatmaxima_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
+        }
+
+        $alias = sanitize_text_field($_POST['alias']);
+        update_option('chatmaxima_channel_alias', $alias);
+
+        wp_send_json_success(['message' => __('Channel saved', 'chatmaxima-ai-chatbot')]);
+    }
+
+    /**
+     * AJAX: Install widget (save channel alias for frontend injection)
+     */
+    public function ajax_install_widget()
+    {
+        check_ajax_referer('chatmaxima_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
+            return;
+        }
+
+        $alias = sanitize_text_field($_POST['alias']);
+
+        if (empty($alias))
+        {
+            wp_send_json_error(['message' => __('Please select a channel first', 'chatmaxima-ai-chatbot')]);
+            return;
+        }
+
+        // Save the installed channel alias
+        update_option('chatmaxima_installed_channel', $alias);
+
+        wp_send_json_success([
+            'message' => __('Widget installed successfully! The chatbot is now active on your site.', 'chatmaxima-ai-chatbot'),
+            'alias' => $alias
+        ]);
+    }
+
+    /**
+     * AJAX: Uninstall widget (remove channel alias)
+     */
+    public function ajax_uninstall_widget()
+    {
+        check_ajax_referer('chatmaxima_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_options'))
+        {
+            wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
+            return;
+        }
+
+        // Remove the installed channel
+        delete_option('chatmaxima_installed_channel');
+
+        wp_send_json_success([
+            'message' => __('Widget uninstalled. The chatbot has been removed from your site.', 'chatmaxima-ai-chatbot')
         ]);
     }
 }
