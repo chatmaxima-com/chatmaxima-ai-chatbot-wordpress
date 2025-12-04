@@ -61,50 +61,30 @@ class ChatMaximaAIChatbot
             $chatmaxima_content_sync = $this->content_sync;
         }
 
-        // Frontend script
+        // Frontend script - add to both frontend and admin for testing
         add_action('wp_footer', [$this, 'add_chatmaxima_script']);
+        add_action('admin_footer', [$this, 'add_chatmaxima_script']);
     }
 
     /**
-     * Add ChatMaxima chatbot script to frontend
+     * Add ChatMaxima chatbot script to frontend and admin
      */
     public function add_chatmaxima_script()
     {
-        $token_id = get_option('chatmaxima_token_id', '');
-        $theme_color = get_option('chatmaxima_theme_color', '');
-        $social_media = get_option('chatmaxima_social_media', []);
+        // Use installed channel alias (set via Install Widget button)
+        $channel_alias = get_option('chatmaxima_installed_channel', '');
 
-        // Don't output script if token is empty
-        if (empty($token_id))
+        // Don't output script if no channel is installed
+        if (empty($channel_alias))
         {
             return;
         }
 
-        // Format social media data
-        $social_media_formatted = [];
-        if (!empty($social_media))
-        {
-            foreach ($social_media as $platform => $handle)
-            {
-                if (!empty($handle))
-                {
-                    $social_media_formatted[] = [
-                        'platform' => $platform,
-                        'handle' => $handle
-                    ];
-                }
-            }
-        }
-
         ?>
-        <script type="text/javascript">
-            window.chatmaximaConfig = {
-                token: '<?php echo esc_js($token_id); ?>',
-                theme_color: '<?php echo esc_js($theme_color); ?>',
-                social_media: <?php echo wp_json_encode($social_media_formatted); ?>
-            };
+        <script>
+            window.chatmaximaConfig = { token: '<?php echo esc_js($channel_alias); ?>' }
         </script>
-        <script src="https://chatmaxima.com/widget/chatmaxima-widget.js" async></script>
+        <script src="https://widget.chatmaxima.com/embed.min.js" id="<?php echo esc_attr($channel_alias); ?>" defer></script>
         <?php
     }
 }

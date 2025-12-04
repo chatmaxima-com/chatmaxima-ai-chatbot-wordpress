@@ -18,10 +18,11 @@ jQuery(document).ready(function($) {
     // Store teams data globally
     var teamsData = [];
 
-    // Load teams and knowledge sources on page load if authenticated
+    // Load teams, knowledge sources, and channels on page load if authenticated
     if (chatmaximaAdmin.isAuthenticated) {
         loadTeams();
         loadKnowledgeSources();
+        loadChannels();
     }
 
     /**
@@ -356,15 +357,11 @@ jQuery(document).ready(function($) {
         var $select = $('#chatmaxima_team');
         var $btn = $('#chatmaxima-refresh-teams-btn');
 
-        console.log('loadTeams called, select element found:', $select.length > 0);
-
         if ($select.length === 0) {
-            console.log('Team dropdown not found on page, skipping loadTeams');
             return; // No dropdown on this page
         }
 
         $btn.prop('disabled', true).text('Loading...');
-        console.log('Making AJAX call to get teams...');
 
         $.ajax({
             url: chatmaximaAdmin.ajaxUrl,
@@ -492,6 +489,200 @@ jQuery(document).ready(function($) {
                 showMessage($message, 'Sync failed. Please try again.', 'error');
                 $btn.prop('disabled', false);
                 $progress.hide();
+            }
+        });
+    }
+
+    /**
+     * Refresh channels handler
+     */
+    $('#chatmaxima-refresh-channels-btn').on('click', function() {
+        loadChannels();
+    });
+
+    /**
+     * Channel selection change - show script preview
+     */
+    $('#chatmaxima_channel').on('change', function() {
+        var alias = $(this).val();
+
+        if (alias) {
+            // Show widget script section
+            $('#chatmaxima-widget-script').show();
+            updateScriptPreview(alias);
+        } else {
+            $('#chatmaxima-widget-script').hide();
+        }
+    });
+
+    /**
+     * Update script preview with selected channel alias
+     */
+    function updateScriptPreview(alias) {
+        var scriptCode = '<script>\n' +
+            '    window.chatmaximaConfig = { token: \'' + alias + '\' }\n' +
+            '</script>\n' +
+            '<script src="https://widget.chatmaxima.com/embed.min.js" id="' + alias + '" defer></script>';
+
+        $('#chatmaxima-script-code').text(scriptCode);
+    }
+
+    /**
+     * Copy script button handler
+     */
+    $('#chatmaxima-copy-script-btn').on('click', function() {
+        var scriptCode = $('#chatmaxima-script-code').text();
+        navigator.clipboard.writeText(scriptCode).then(function() {
+            showMessage($('#chatmaxima-install-message'), 'Script copied to clipboard!', 'success');
+        }).catch(function() {
+            // Fallback for older browsers
+            var $temp = $('<textarea>');
+            $('body').append($temp);
+            $temp.val(scriptCode).select();
+            document.execCommand('copy');
+            $temp.remove();
+            showMessage($('#chatmaxima-install-message'), 'Script copied to clipboard!', 'success');
+        });
+    });
+
+    /**
+     * Install widget button handler
+     */
+    $('#chatmaxima-install-widget-btn').on('click', function() {
+        var alias = $('#chatmaxima_channel').val();
+        var $btn = $(this);
+
+        if (!alias) {
+            showMessage($('#chatmaxima-install-message'), 'Please select a channel first', 'error');
+            return;
+        }
+
+        $btn.prop('disabled', true).text('Installing...');
+
+        $.ajax({
+            url: chatmaximaAdmin.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'chatmaxima_install_widget',
+                nonce: chatmaximaAdmin.nonce,
+                alias: alias
+            },
+            success: function(response) {
+                if (response.success) {
+                    showMessage($('#chatmaxima-install-message'), response.data.message, 'success');
+                    $('#chatmaxima-install-widget-btn').hide();
+                    $('#chatmaxima-uninstall-widget-btn').show();
+                    $('#chatmaxima-widget-status').show();
+                } else {
+                    showMessage($('#chatmaxima-install-message'), response.data.message || 'Installation failed', 'error');
+                }
+                $btn.prop('disabled', false).text('Install Widget');
+            },
+            error: function() {
+                showMessage($('#chatmaxima-install-message'), 'Installation failed. Please try again.', 'error');
+                $btn.prop('disabled', false).text('Install Widget');
+            }
+        });
+    });
+
+    /**
+     * Uninstall widget button handler
+     */
+    $('#chatmaxima-uninstall-widget-btn').on('click', function() {
+        var $btn = $(this);
+
+        $btn.prop('disabled', true).text('Uninstalling...');
+
+        $.ajax({
+            url: chatmaximaAdmin.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'chatmaxima_uninstall_widget',
+                nonce: chatmaximaAdmin.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    showMessage($('#chatmaxima-install-message'), response.data.message, 'success');
+                    $('#chatmaxima-uninstall-widget-btn').hide();
+                    $('#chatmaxima-install-widget-btn').show();
+                    $('#chatmaxima-widget-status').hide();
+                } else {
+                    showMessage($('#chatmaxima-install-message'), response.data.message || 'Uninstallation failed', 'error');
+                }
+                $btn.prop('disabled', false).text('Uninstall Widget');
+            },
+            error: function() {
+                showMessage($('#chatmaxima-install-message'), 'Uninstallation failed. Please try again.', 'error');
+                $btn.prop('disabled', false).text('Uninstall Widget');
+            }
+        });
+    });
+
+    /**
+     * Load channels via AJAX
+     */
+    function loadChannels() {
+        var $select = $('#chatmaxima_channel');
+        var $btn = $('#chatmaxima-refresh-channels-btn');
+
+        if ($select.length === 0) {
+            return; // No dropdown on this page
+        }
+
+        $btn.prop('disabled', true).text('Loading...');
+
+        $.ajax({
+            url: chatmaximaAdmin.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'chatmaxima_get_channels',
+                nonce: chatmaximaAdmin.nonce,
+                platform: 'livechatwidget' // Only load web channels for WordPress widget
+            },
+            success: function(response) {
+                if (response.success) {
+                    var channels = response.data.channels;
+                    var selected = response.data.selected;
+
+                    $select.find('option').remove();
+                    $select.append($('<option></option>').val('').text('-- Select Channel --'));
+
+                    if (channels && channels.length > 0) {
+                        channels.forEach(function(channel) {
+                            var displayName = channel.name || channel.alias;
+                            var $option = $('<option></option>')
+                                .val(channel.alias)
+                                .text(displayName)
+                                .data('channel', channel);
+
+                            if (channel.alias === selected) {
+                                $option.prop('selected', true);
+                            }
+
+                            $select.append($option);
+                        });
+
+                        // Update script preview if selected
+                        if (selected) {
+                            $('#chatmaxima-widget-script').show();
+                            updateScriptPreview(selected);
+                        }
+
+                        // Show count message
+                        $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available').addClass('success');
+                    } else {
+                        $('#chatmaxima-channel-message').text('No web channels found. Create one in ChatMaxima dashboard.').addClass('error');
+                    }
+                } else {
+                    console.error('Channels AJAX error response:', response);
+                    showMessage($('#chatmaxima-channel-message'), response.data.message || 'Failed to load channels', 'error');
+                }
+                $btn.prop('disabled', false).text('Refresh');
+            },
+            error: function(xhr, status, error) {
+                console.error('Channels AJAX request failed:', error, xhr.responseText);
+                showMessage($('#chatmaxima-channel-message'), 'Failed to load channels: ' + error, 'error');
+                $btn.prop('disabled', false).text('Refresh');
             }
         });
     }
