@@ -326,7 +326,7 @@ class ChatMaxima_Admin_Settings
                             printf(__('Connected as %s (%s)', 'chatmaxima-ai-chatbot'), esc_html($user_info['name']), esc_html($user_info['email']));
                             if (!empty($user_info['team_alias']))
                             {
-                                echo '<br><small>' . sprintf(__('Team ID: %s', 'chatmaxima-ai-chatbot'), esc_html($user_info['team_alias'])) . '</small>';
+                                echo '<br><small>' . sprintf(__('Workspace ID: %s', 'chatmaxima-ai-chatbot'), esc_html($user_info['team_alias'])) . '</small>';
                             }
                         }
                         else
@@ -362,16 +362,16 @@ class ChatMaxima_Admin_Settings
                     <span id="chatmaxima-connection-message" class="chatmaxima-message"></span>
                 </p>
 
-                <!-- Team Selection -->
+                <!-- Workspace Selection -->
                 <div class="chatmaxima-team-selector" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-                    <h3><?php _e('Team Selection', 'chatmaxima-ai-chatbot'); ?></h3>
-                    <p class="description"><?php _e('Select the team/workspace to use for knowledge sources and content sync.', 'chatmaxima-ai-chatbot'); ?></p>
+                    <h3><?php _e('Workspace Selection', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <p class="description"><?php _e('Select the workspace to use for knowledge sources and content sync.', 'chatmaxima-ai-chatbot'); ?></p>
                     <table class="form-table">
                         <tr>
-                            <th><label for="chatmaxima_team"><?php _e('Team', 'chatmaxima-ai-chatbot'); ?></label></th>
+                            <th><label for="chatmaxima_team"><?php _e('Workspace', 'chatmaxima-ai-chatbot'); ?></label></th>
                             <td>
                                 <select id="chatmaxima_team" class="regular-text">
-                                    <option value=""><?php _e('-- Loading teams... --', 'chatmaxima-ai-chatbot'); ?></option>
+                                    <option value=""><?php _e('-- Loading workspaces... --', 'chatmaxima-ai-chatbot'); ?></option>
                                 </select>
                                 <button type="button" id="chatmaxima-refresh-teams-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
                                 <span id="chatmaxima-team-message" class="chatmaxima-message"></span>
@@ -512,23 +512,38 @@ class ChatMaxima_Admin_Settings
                         <button type="button" id="chatmaxima-copy-script-btn" class="button" style="position: absolute; top: 10px; right: 10px;"><?php _e('Copy', 'chatmaxima-ai-chatbot'); ?></button>
                     </div>
 
-                    <div style="margin-top: 15px;">
-                        <button type="button" id="chatmaxima-install-widget-btn" class="button button-primary button-hero" <?php echo $is_widget_installed ? 'style="display:none;"' : ''; ?>>
-                            <?php _e('Install Widget', 'chatmaxima-ai-chatbot'); ?>
-                        </button>
-                        <button type="button" id="chatmaxima-uninstall-widget-btn" class="button button-secondary" <?php echo !$is_widget_installed ? 'style="display:none;"' : ''; ?>>
-                            <?php _e('Uninstall Widget', 'chatmaxima-ai-chatbot'); ?>
-                        </button>
-                        <span id="chatmaxima-install-message" class="chatmaxima-message" style="margin-left: 10px;"></span>
+                    <div style="margin-top: 15px; display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start;">
+                        <!-- Admin Playground Button -->
+                        <div style="flex: 1; min-width: 200px; padding: 15px; background: #f0f6fc; border: 1px solid #0366d6; border-radius: 6px;">
+                            <h4 style="margin: 0 0 8px 0; color: #0366d6;"><?php _e('Admin Preview', 'chatmaxima-ai-chatbot'); ?></h4>
+                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #586069;"><?php _e('Test the widget in this admin area only. Visitors won\'t see it.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <button type="button" id="chatmaxima-preview-widget-btn" class="button button-secondary">
+                                <?php _e('Preview Widget', 'chatmaxima-ai-chatbot'); ?>
+                            </button>
+                        </div>
+
+                        <!-- Enable for Users Button -->
+                        <div style="flex: 1; min-width: 200px; padding: 15px; background: <?php echo $is_widget_installed ? '#d4edda' : '#fff3cd'; ?>; border: 1px solid <?php echo $is_widget_installed ? '#c3e6cb' : '#ffc107'; ?>; border-radius: 6px;">
+                            <h4 style="margin: 0 0 8px 0; color: <?php echo $is_widget_installed ? '#155724' : '#856404'; ?>;"><?php _e('Live on Site', 'chatmaxima-ai-chatbot'); ?></h4>
+                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #586069;"><?php _e('Enable the widget for all visitors on your website.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <button type="button" id="chatmaxima-install-widget-btn" class="button button-primary" <?php echo $is_widget_installed ? 'style="display:none;"' : ''; ?>>
+                                <?php _e('Enable for Visitors', 'chatmaxima-ai-chatbot'); ?>
+                            </button>
+                            <button type="button" id="chatmaxima-uninstall-widget-btn" class="button button-secondary" <?php echo !$is_widget_installed ? 'style="display:none;"' : ''; ?>>
+                                <?php _e('Disable for Visitors', 'chatmaxima-ai-chatbot'); ?>
+                            </button>
+                        </div>
                     </div>
+
+                    <span id="chatmaxima-install-message" class="chatmaxima-message" style="display: block; margin-top: 10px;"></span>
 
                     <?php if ($is_widget_installed): ?>
                     <div id="chatmaxima-widget-status" style="margin-top: 15px; padding: 10px 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
-                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is installed and active on your site.', 'chatmaxima-ai-chatbot'); ?>
+                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is enabled and visible to all visitors on your site.', 'chatmaxima-ai-chatbot'); ?>
                     </div>
                     <?php else: ?>
                     <div id="chatmaxima-widget-status" style="display: none; margin-top: 15px; padding: 10px 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
-                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is installed and active on your site.', 'chatmaxima-ai-chatbot'); ?>
+                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is enabled and visible to all visitors on your site.', 'chatmaxima-ai-chatbot'); ?>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -1002,7 +1017,7 @@ class ChatMaxima_Admin_Settings
 
         if (empty($team_alias))
         {
-            wp_send_json_error(['message' => __('Team alias is required', 'chatmaxima-ai-chatbot')]);
+            wp_send_json_error(['message' => __('Workspace alias is required', 'chatmaxima-ai-chatbot')]);
         }
 
         $result = $this->api_client->switch_team($team_alias);
@@ -1012,11 +1027,11 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => $result->get_error_message()]);
         }
 
-        // Clear knowledge source selection when team changes
+        // Clear knowledge source selection when workspace changes
         delete_option('chatmaxima_knowledge_source_alias');
 
         wp_send_json_success([
-            'message' => __('Team switched successfully', 'chatmaxima-ai-chatbot'),
+            'message' => __('Workspace switched successfully', 'chatmaxima-ai-chatbot'),
             'team' => isset($result['team']) ? $result['team'] : null
         ]);
     }
@@ -1076,9 +1091,10 @@ class ChatMaxima_Admin_Settings
         if (!current_user_can('manage_options'))
         {
             wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
+            return;
         }
 
-        $alias = sanitize_text_field($_POST['alias']);
+        $alias = isset($_POST['alias']) ? sanitize_text_field($_POST['alias']) : '';
         update_option('chatmaxima_channel_alias', $alias);
 
         wp_send_json_success(['message' => __('Channel saved', 'chatmaxima-ai-chatbot')]);

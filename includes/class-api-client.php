@@ -19,6 +19,7 @@ class ChatMaxima_API_Client
     private $access_token = null;
     private $refresh_token = null;
     private $token_expiry = null;
+    private static $is_refreshing = false; // Prevent concurrent token refresh
 
     public function __construct()
     {
@@ -76,6 +77,15 @@ class ChatMaxima_API_Client
         // Check if token is expired
         if ($this->token_expiry && time() >= $this->token_expiry)
         {
+            // If another request is already refreshing, wait and reload tokens
+            if (self::$is_refreshing)
+            {
+                // Wait briefly for the other refresh to complete
+                usleep(500000); // 0.5 seconds
+                $this->load_tokens(); // Reload tokens that may have been refreshed
+                return !empty($this->access_token) && time() < $this->token_expiry;
+            }
+
             // Try to refresh the token
             return $this->refresh_access_token();
         }
@@ -131,6 +141,17 @@ class ChatMaxima_API_Client
             return false;
         }
 
+        // Prevent concurrent token refresh
+        if (self::$is_refreshing)
+        {
+            // Wait and reload tokens
+            usleep(500000); // 0.5 seconds
+            $this->load_tokens();
+            return !empty($this->access_token) && time() < $this->token_expiry;
+        }
+
+        self::$is_refreshing = true;
+
         $response = $this->make_request('auth/refresh/', 'POST', [
             'refresh_token' => $this->refresh_token,
             'remember_me' => true
@@ -138,6 +159,7 @@ class ChatMaxima_API_Client
 
         if (is_wp_error($response))
         {
+            self::$is_refreshing = false;
             $this->clear_tokens();
             return false;
         }
@@ -150,9 +172,11 @@ class ChatMaxima_API_Client
                 $data['refresh_token'],
                 $data['expires_in']
             );
+            self::$is_refreshing = false;
             return true;
         }
 
+        self::$is_refreshing = false;
         $this->clear_tokens();
         return false;
     }
@@ -435,7 +459,7 @@ class ChatMaxima_API_Client
         }
 
         // Return more detailed error if available
-        $error_message = 'Failed to fetch teams';
+        $error_message = 'Failed to fetch workspaces';
         if (isset($response['error']['message']))
         {
             $error_message = $response['error']['message'];
@@ -496,7 +520,7 @@ class ChatMaxima_API_Client
             return $data;
         }
 
-        $error_message = isset($response['error']['message']) ? $response['error']['message'] : 'Failed to switch team';
+        $error_message = isset($response['error']['message']) ? $response['error']['message'] : 'Failed to switch workspace';
         return new WP_Error('switch_failed', $error_message);
     }
 

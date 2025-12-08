@@ -18,11 +18,21 @@ jQuery(document).ready(function($) {
     // Store teams data globally
     var teamsData = [];
 
+    // Track loading state to prevent race conditions
+    var isLoadingTeams = false;
+    var isLoadingChannels = false;
+    var isLoadingKnowledgeSources = false;
+
+    // Default AJAX timeout (15 seconds)
+    var ajaxTimeout = 15000;
+
+    // Max retry attempts
+    var maxRetries = 2;
+
     // Load teams, knowledge sources, and channels on page load if authenticated
+    // Load sequentially to avoid race conditions with token refresh
     if (chatmaximaAdmin.isAuthenticated) {
-        loadTeams();
-        loadKnowledgeSources();
-        loadChannels();
+        loadTeamsWithRetry(0);
     }
 
     /**
@@ -147,7 +157,7 @@ jQuery(document).ready(function($) {
     });
 
     /**
-     * Team selection change - switch team
+     * Workspace selection change - switch workspace
      */
     $('#chatmaxima_team').on('change', function() {
         var teamAlias = $(this).val();
@@ -159,7 +169,7 @@ jQuery(document).ready(function($) {
         }
 
         $select.prop('disabled', true);
-        $message.removeClass('success error').text('Switching team...');
+        $message.removeClass('success error').text('Switching workspace...');
 
         $.ajax({
             url: chatmaximaAdmin.ajaxUrl,
@@ -182,7 +192,7 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function() {
-                showMessage($message, 'Failed to switch team. Please try again.', 'error');
+                showMessage($message, 'Failed to switch workspace. Please try again.', 'error');
                 $select.prop('disabled', false);
             }
         });
@@ -293,26 +303,36 @@ jQuery(document).ready(function($) {
     });
 
     /**
-     * Load knowledge sources via AJAX
+     * Load knowledge sources via AJAX with retry support
      */
-    function loadKnowledgeSources() {
+    function loadKnowledgeSourcesWithRetry(attempt) {
         var $select = $('#chatmaxima_knowledge_source');
         var $btn = $('#chatmaxima-refresh-ks-btn');
 
         if ($select.length === 0) {
-            return; // No dropdown on this page
+            // No dropdown, proceed to load channels
+            loadChannelsWithRetry(0);
+            return;
         }
+
+        // Prevent concurrent loads
+        if (isLoadingKnowledgeSources) {
+            return;
+        }
+        isLoadingKnowledgeSources = true;
 
         $btn.prop('disabled', true).text('Loading...');
 
         $.ajax({
             url: chatmaximaAdmin.ajaxUrl,
             type: 'POST',
+            timeout: ajaxTimeout,
             data: {
                 action: 'chatmaxima_get_knowledge_sources',
                 nonce: chatmaximaAdmin.nonce
             },
             success: function(response) {
+                isLoadingKnowledgeSources = false;
                 if (response.success) {
                     var sources = response.data.knowledge_sources;
                     var selected = response.data.selected;
@@ -341,36 +361,80 @@ jQuery(document).ready(function($) {
                             updateKsDetails(selected);
                         }
                     }
+                    $btn.prop('disabled', false).text('Refresh');
+
+                    // Load channels after knowledge sources loaded successfully
+                    loadChannelsWithRetry(0);
+                } else {
+                    // Retry on failure
+                    if (attempt < maxRetries) {
+                        console.log('Retrying knowledge sources load, attempt ' + (attempt + 1));
+                        setTimeout(function() {
+                            isLoadingKnowledgeSources = false;
+                            loadKnowledgeSourcesWithRetry(attempt + 1);
+                        }, Math.pow(2, attempt) * 1000);
+                    } else {
+                        $btn.prop('disabled', false).text('Refresh');
+                        // Still try to load channels
+                        loadChannelsWithRetry(0);
+                    }
                 }
-                $btn.prop('disabled', false).text('Refresh');
             },
-            error: function() {
-                $btn.prop('disabled', false).text('Refresh');
+            error: function(xhr, status, error) {
+                isLoadingKnowledgeSources = false;
+                // Retry on network error
+                if (attempt < maxRetries) {
+                    console.log('Retrying knowledge sources load after error, attempt ' + (attempt + 1));
+                    setTimeout(function() {
+                        loadKnowledgeSourcesWithRetry(attempt + 1);
+                    }, Math.pow(2, attempt) * 1000);
+                } else {
+                    $btn.prop('disabled', false).text('Refresh');
+                    // Still try to load channels
+                    loadChannelsWithRetry(0);
+                }
             }
         });
     }
 
     /**
-     * Load teams via AJAX
+     * Load knowledge sources via AJAX (wrapper for manual refresh)
      */
-    function loadTeams() {
+    function loadKnowledgeSources() {
+        loadKnowledgeSourcesWithRetry(0);
+    }
+
+    /**
+     * Load teams via AJAX with retry support
+     */
+    function loadTeamsWithRetry(attempt) {
         var $select = $('#chatmaxima_team');
         var $btn = $('#chatmaxima-refresh-teams-btn');
 
         if ($select.length === 0) {
-            return; // No dropdown on this page
+            // No dropdown, proceed to load other data
+            loadKnowledgeSourcesWithRetry(0);
+            return;
         }
+
+        // Prevent concurrent loads
+        if (isLoadingTeams) {
+            return;
+        }
+        isLoadingTeams = true;
 
         $btn.prop('disabled', true).text('Loading...');
 
         $.ajax({
             url: chatmaximaAdmin.ajaxUrl,
             type: 'POST',
+            timeout: ajaxTimeout,
             data: {
                 action: 'chatmaxima_get_teams',
                 nonce: chatmaximaAdmin.nonce
             },
             success: function(response) {
+                isLoadingTeams = false;
                 if (response.success) {
                     var teams = response.data.teams;
                     var selected = response.data.selected;
@@ -379,7 +443,7 @@ jQuery(document).ready(function($) {
                     teamsData = teams || [];
 
                     $select.find('option').remove();
-                    $select.append($('<option></option>').val('').text('-- Select Team --'));
+                    $select.append($('<option></option>').val('').text('-- Select Workspace --'));
 
                     if (teams && teams.length > 0) {
                         teams.forEach(function(team) {
@@ -396,25 +460,57 @@ jQuery(document).ready(function($) {
                         });
                     }
 
-                    // Show message if only one team
+                    // Show message if only one workspace
                     if (teams && teams.length === 1) {
-                        $('#chatmaxima-team-message').text('You have access to 1 team').addClass('success');
+                        $('#chatmaxima-team-message').text('You have access to 1 workspace').addClass('success');
                     } else if (teams && teams.length > 1) {
-                        $('#chatmaxima-team-message').text(teams.length + ' teams available').addClass('success');
+                        $('#chatmaxima-team-message').text(teams.length + ' workspaces available').addClass('success');
                     }
+                    $btn.prop('disabled', false).text('Refresh');
+
+                    // Load knowledge sources after teams loaded successfully
+                    loadKnowledgeSourcesWithRetry(0);
                 } else {
-                    // Show error message
-                    showMessage($('#chatmaxima-team-message'), response.data.message || 'Failed to load teams', 'error');
-                    console.error('Load teams error:', response);
+                    // Retry on failure
+                    if (attempt < maxRetries) {
+                        console.log('Retrying teams load, attempt ' + (attempt + 1));
+                        setTimeout(function() {
+                            isLoadingTeams = false;
+                            loadTeamsWithRetry(attempt + 1);
+                        }, Math.pow(2, attempt) * 1000); // Exponential backoff: 1s, 2s, 4s
+                    } else {
+                        showMessage($('#chatmaxima-team-message'), response.data.message || 'Failed to load workspaces', 'error');
+                        console.error('Load teams error:', response);
+                        $btn.prop('disabled', false).text('Refresh');
+                        // Still try to load other data
+                        loadKnowledgeSourcesWithRetry(0);
+                    }
                 }
-                $btn.prop('disabled', false).text('Refresh');
             },
             error: function(xhr, status, error) {
-                showMessage($('#chatmaxima-team-message'), 'Failed to load teams: ' + error, 'error');
-                console.error('Load teams AJAX error:', xhr, status, error);
-                $btn.prop('disabled', false).text('Refresh');
+                isLoadingTeams = false;
+                // Retry on network error
+                if (attempt < maxRetries) {
+                    console.log('Retrying teams load after error, attempt ' + (attempt + 1));
+                    setTimeout(function() {
+                        loadTeamsWithRetry(attempt + 1);
+                    }, Math.pow(2, attempt) * 1000);
+                } else {
+                    showMessage($('#chatmaxima-team-message'), 'Failed to load workspaces: ' + error, 'error');
+                    console.error('Load teams AJAX error:', xhr, status, error);
+                    $btn.prop('disabled', false).text('Refresh');
+                    // Still try to load other data
+                    loadKnowledgeSourcesWithRetry(0);
+                }
             }
         });
+    }
+
+    /**
+     * Load teams via AJAX (wrapper for manual refresh)
+     */
+    function loadTeams() {
+        loadTeamsWithRetry(0);
     }
 
     /**
@@ -501,7 +597,7 @@ jQuery(document).ready(function($) {
     });
 
     /**
-     * Channel selection change - show script preview
+     * Channel selection change - show script preview and save selection
      */
     $('#chatmaxima_channel').on('change', function() {
         var alias = $(this).val();
@@ -510,6 +606,22 @@ jQuery(document).ready(function($) {
             // Show widget script section
             $('#chatmaxima-widget-script').show();
             updateScriptPreview(alias);
+
+            // Save channel selection to database
+            $.ajax({
+                url: chatmaximaAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'chatmaxima_save_channel_selection',
+                    nonce: chatmaximaAdmin.nonce,
+                    alias: alias
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showMessage($('#chatmaxima-channel-message'), 'Channel selected', 'success');
+                    }
+                }
+            });
         } else {
             $('#chatmaxima-widget-script').hide();
         }
@@ -526,6 +638,77 @@ jQuery(document).ready(function($) {
 
         $('#chatmaxima-script-code').text(scriptCode);
     }
+
+    /**
+     * Preview Widget button handler - Load widget in admin area only
+     */
+    var previewWidgetLoaded = false;
+    $('#chatmaxima-preview-widget-btn').on('click', function() {
+        var alias = $('#chatmaxima_channel').val();
+        var $btn = $(this);
+
+        if (!alias) {
+            showMessage($('#chatmaxima-install-message'), 'Please select a channel first', 'error');
+            return;
+        }
+
+        if (previewWidgetLoaded) {
+            // Remove preview widget - reload page is the cleanest way
+            // since widget scripts often can't be cleanly unloaded
+            showMessage($('#chatmaxima-install-message'), 'Removing preview...', 'success');
+            previewWidgetLoaded = false;
+
+            // Remove injected scripts
+            $('#chatmaxima-preview-script').remove();
+            $('#chatmaxima-preview-config').remove();
+
+            // Remove widget iframe and container elements
+            // The widget typically creates elements like cm-widget, cm-frame, etc.
+            $('iframe[src*="chatmaxima"]').remove();
+            $('iframe[id*="chatmaxima"]').remove();
+            $('[id^="cm-"]').remove();
+            $('[class^="cm-"]').remove();
+            $('[id*="chatmaxima"]').not('.chatmaxima-settings-wrap, .chatmaxima-settings-wrap *').remove();
+            $('[class*="widget-chatmaxima"]').remove();
+
+            // Clear the global config
+            if (window.chatmaximaConfig) {
+                delete window.chatmaximaConfig;
+            }
+            if (window.ChatMaxima) {
+                delete window.ChatMaxima;
+            }
+
+            $btn.text('Preview Widget');
+            showMessage($('#chatmaxima-install-message'), 'Preview widget removed. Refresh the page if the widget is still visible.', 'success');
+            return;
+        }
+
+        $btn.prop('disabled', true).text('Loading...');
+
+        // Inject the widget script dynamically for admin preview
+        window.chatmaximaConfig = { token: alias };
+
+        var configScript = document.createElement('script');
+        configScript.id = 'chatmaxima-preview-config';
+        configScript.textContent = 'window.chatmaximaConfig = { token: "' + alias + '" };';
+        document.body.appendChild(configScript);
+
+        var widgetScript = document.createElement('script');
+        widgetScript.id = 'chatmaxima-preview-script';
+        widgetScript.src = 'https://widget.chatmaxima.com/embed.min.js';
+        widgetScript.defer = true;
+        widgetScript.onload = function() {
+            previewWidgetLoaded = true;
+            $btn.prop('disabled', false).text('Hide Preview');
+            showMessage($('#chatmaxima-install-message'), 'Widget preview loaded! You can now test the chatbot.', 'success');
+        };
+        widgetScript.onerror = function() {
+            $btn.prop('disabled', false).text('Preview Widget');
+            showMessage($('#chatmaxima-install-message'), 'Failed to load widget preview', 'error');
+        };
+        document.body.appendChild(widgetScript);
+    });
 
     /**
      * Copy script button handler
@@ -619,9 +802,9 @@ jQuery(document).ready(function($) {
     });
 
     /**
-     * Load channels via AJAX
+     * Load channels via AJAX with retry support
      */
-    function loadChannels() {
+    function loadChannelsWithRetry(attempt) {
         var $select = $('#chatmaxima_channel');
         var $btn = $('#chatmaxima-refresh-channels-btn');
 
@@ -629,24 +812,35 @@ jQuery(document).ready(function($) {
             return; // No dropdown on this page
         }
 
+        // Prevent concurrent loads
+        if (isLoadingChannels) {
+            return;
+        }
+        isLoadingChannels = true;
+
         $btn.prop('disabled', true).text('Loading...');
 
         $.ajax({
             url: chatmaximaAdmin.ajaxUrl,
             type: 'POST',
+            timeout: ajaxTimeout,
             data: {
                 action: 'chatmaxima_get_channels',
                 nonce: chatmaximaAdmin.nonce,
                 platform: 'livechatwidget' // Only load web channels for WordPress widget
             },
             success: function(response) {
+                isLoadingChannels = false;
                 if (response.success) {
                     var channels = response.data.channels;
                     var selected = response.data.selected;
 
+                    console.log('Channels loaded:', channels.length, 'Selected:', selected); // Debug
+
                     $select.find('option').remove();
                     $select.append($('<option></option>').val('').text('-- Select Channel --'));
 
+                    var foundSelected = false;
                     if (channels && channels.length > 0) {
                         channels.forEach(function(channel) {
                             var displayName = channel.name || channel.alias;
@@ -655,36 +849,68 @@ jQuery(document).ready(function($) {
                                 .text(displayName)
                                 .data('channel', channel);
 
-                            if (channel.alias === selected) {
+                            if (selected && channel.alias === selected) {
                                 $option.prop('selected', true);
+                                foundSelected = true;
+                                console.log('Selected channel found:', channel.alias); // Debug
                             }
 
                             $select.append($option);
                         });
 
                         // Update script preview if selected
-                        if (selected) {
+                        if (selected && foundSelected) {
                             $('#chatmaxima-widget-script').show();
                             updateScriptPreview(selected);
                         }
 
-                        // Show count message
-                        $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available').addClass('success');
+                        // Show count message with selected info
+                        if (foundSelected) {
+                            $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available - ' + selected + ' selected').addClass('success');
+                        } else {
+                            $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available').addClass('success');
+                        }
                     } else {
                         $('#chatmaxima-channel-message').text('No web channels found. Create one in ChatMaxima dashboard.').addClass('error');
                     }
+                    $btn.prop('disabled', false).text('Refresh');
                 } else {
-                    console.error('Channels AJAX error response:', response);
-                    showMessage($('#chatmaxima-channel-message'), response.data.message || 'Failed to load channels', 'error');
+                    // Retry on failure
+                    if (attempt < maxRetries) {
+                        console.log('Retrying channels load, attempt ' + (attempt + 1));
+                        setTimeout(function() {
+                            isLoadingChannels = false;
+                            loadChannelsWithRetry(attempt + 1);
+                        }, Math.pow(2, attempt) * 1000);
+                    } else {
+                        console.error('Channels AJAX error response:', response);
+                        showMessage($('#chatmaxima-channel-message'), response.data.message || 'Failed to load channels', 'error');
+                        $btn.prop('disabled', false).text('Refresh');
+                    }
                 }
-                $btn.prop('disabled', false).text('Refresh');
             },
             error: function(xhr, status, error) {
-                console.error('Channels AJAX request failed:', error, xhr.responseText);
-                showMessage($('#chatmaxima-channel-message'), 'Failed to load channels: ' + error, 'error');
-                $btn.prop('disabled', false).text('Refresh');
+                isLoadingChannels = false;
+                // Retry on network error
+                if (attempt < maxRetries) {
+                    console.log('Retrying channels load after error, attempt ' + (attempt + 1));
+                    setTimeout(function() {
+                        loadChannelsWithRetry(attempt + 1);
+                    }, Math.pow(2, attempt) * 1000);
+                } else {
+                    console.error('Channels AJAX request failed:', error, xhr.responseText);
+                    showMessage($('#chatmaxima-channel-message'), 'Failed to load channels: ' + error, 'error');
+                    $btn.prop('disabled', false).text('Refresh');
+                }
             }
         });
+    }
+
+    /**
+     * Load channels via AJAX (wrapper for manual refresh)
+     */
+    function loadChannels() {
+        loadChannelsWithRetry(0);
     }
 
     /**
