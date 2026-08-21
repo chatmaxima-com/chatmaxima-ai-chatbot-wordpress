@@ -61,9 +61,8 @@ class ChatMaximaAIChatbot
             $chatmaxima_content_sync = $this->content_sync;
         }
 
-        // Frontend script - add to both frontend and admin for testing
+        // Frontend widget script (rendered only when a channel is installed)
         add_action('wp_footer', [$this, 'add_chatmaxima_script']);
-        add_action('admin_footer', [$this, 'add_chatmaxima_script']);
     }
 
     /**
@@ -71,21 +70,8 @@ class ChatMaximaAIChatbot
      */
     public function add_chatmaxima_script()
     {
-        // Use installed channel alias (set via Install Widget button) for frontend
-        $installed_channel = get_option('chatmaxima_installed_channel', '');
-
-        // For admin area, also show widget if a channel is selected (for preview)
-        // This allows admins to preview the widget without enabling it for visitors
-        if (is_admin())
-        {
-            $selected_channel = get_option('chatmaxima_channel_alias', '');
-            $channel_alias = !empty($installed_channel) ? $installed_channel : $selected_channel;
-        }
-        else
-        {
-            // For frontend, only show if widget is explicitly installed
-            $channel_alias = $installed_channel;
-        }
+        // Only render the widget on the frontend when it has been explicitly installed
+        $channel_alias = get_option('chatmaxima_installed_channel', '');
 
         // Don't output script if no channel is available
         if (empty($channel_alias))

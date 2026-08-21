@@ -1,8 +1,8 @@
 === ChatMaxima AI Chatbot ===
 Contributors: chatmaxima
-Tags: chatbot, ai, customer support, live chat, social media, knowledge base
+Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
-Tested up to: 6.4
+Tested up to: 7.0
 Requires PHP: 7.4
 Stable tag: 2.0.0
 License: GPLv2 or later
@@ -120,6 +120,21 @@ Yes, each post has a "ChatMaxima Sync" meta box where you can check "Exclude fro
 = Does auto-sync work with custom post types? =
 
 Yes, you can select which post types to sync in the settings. Auto-sync will work for all selected post types.
+
+== External Services ==
+
+This plugin connects to ChatMaxima, a third-party AI chatbot and customer messaging service, to provide its core functionality. A ChatMaxima account is required.
+
+The plugin communicates with ChatMaxima in the following ways:
+
+* **Chatbot widget:** On pages where the widget is enabled, the plugin loads the ChatMaxima widget script from https://widget.chatmaxima.com/embed.min.js so the chatbot can render for your visitors.
+* **Account authentication:** When you connect the plugin, your ChatMaxima login credentials are sent to the ChatMaxima API to obtain an access token. Only the resulting token is stored in your WordPress database.
+* **Content sync:** When you sync content, the URLs of the WordPress posts and pages you choose (and their content, for crawling) are sent to the ChatMaxima API so they can be indexed into your selected knowledge source for AI training.
+
+Data is sent to ChatMaxima only when you connect the plugin, sync content, or serve the widget. The plugin itself does not collect personal data from your site visitors.
+
+* ChatMaxima Terms of Service: https://chatmaxima.com/terms/
+* ChatMaxima Privacy Policy: https://chatmaxima.com/privacy/
 
 == Screenshots ==
 
