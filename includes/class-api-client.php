@@ -377,7 +377,7 @@ class ChatMaxima_API_Client
         // Add body for POST/PUT/DELETE requests
         if ($body && in_array($method, ['POST', 'PUT', 'DELETE']))
         {
-            $args['body'] = json_encode($body);
+            $args['body'] = wp_json_encode($body);
         }
 
         $response = wp_remote_request($url, $args);

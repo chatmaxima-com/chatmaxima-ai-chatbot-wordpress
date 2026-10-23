@@ -2,9 +2,9 @@
 Contributors: chatmaxima
 Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,7 +133,7 @@ The plugin communicates with ChatMaxima in the following ways:
 
 Data is sent to ChatMaxima only when you connect the plugin, sync content, or serve the widget. The plugin itself does not collect personal data from your site visitors.
 
-* ChatMaxima Terms of Service: https://chatmaxima.com/terms/
+* ChatMaxima Terms of Service: https://chatmaxima.com/tos/
 * ChatMaxima Privacy Policy: https://chatmaxima.com/privacy/
 
 == Screenshots ==
@@ -146,6 +146,13 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 6. Chatbot widget settings
 
 == Changelog ==
+
+= 2.0.1 =
+* The chatbot widget now loads through wp_enqueue_script, so caching and optimization plugins handle it like any other script
+* All admin text is escaped on output and all form input is unslashed and sanitized
+* The post editor sync box shows sync errors inline instead of in a browser alert
+* Uninstall now also removes the installed-channel settings on every site of a multisite network
+* Updated documentation, support and terms links
 
 = 2.0.0 =
 * Added API v2 authentication with JWT
@@ -175,7 +182,7 @@ Initial release of ChatMaxima AI Chatbot plugin.
 
 == Support ==
 
-For support and documentation, visit [ChatMaxima Documentation](https://chatmaxima.com/docs) or contact support@chatmaxima.com.
+For support and documentation, visit [ChatMaxima Documentation](https://docs.chatmaxima.com/) or contact support@chatmaxima.com.
 
 == Privacy Policy ==
 
@@ -184,4 +191,4 @@ This plugin connects to ChatMaxima services to provide chatbot and knowledge sou
 - Content is indexed for AI training
 - No personal user data is collected from your visitors
 
-Please review ChatMaxima's privacy policy for complete information about data handling.
+Please review ChatMaxima's privacy policy (https://chatmaxima.com/privacy/) for complete information about data handling.

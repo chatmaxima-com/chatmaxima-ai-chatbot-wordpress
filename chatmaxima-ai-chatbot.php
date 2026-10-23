@@ -3,7 +3,7 @@
  * Plugin Name: ChatMaxima AI Chatbot
  * Plugin URI: https://chatmaxima.com/
  * Description: AI-powered chatbot integration for WordPress with customizable themes, social media support, and knowledge source management.
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: ChatMaxima
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -19,7 +19,7 @@ if (!defined('ABSPATH'))
 // Define plugin constants
 define('CHATMAXIMA_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CHATMAXIMA_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('CHATMAXIMA_VERSION', '2.0.0');
+define('CHATMAXIMA_VERSION', '2.0.1');
 
 // Include required files
 require_once CHATMAXIMA_PLUGIN_PATH . 'includes/class-api-client.php';
@@ -61,35 +61,56 @@ class ChatMaximaAIChatbot
             $chatmaxima_content_sync = $this->content_sync;
         }
 
-        // Frontend widget script (rendered only when a channel is installed)
-        add_action('wp_footer', [$this, 'add_chatmaxima_script']);
+        // Frontend widget script (enqueued only when a channel is installed)
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_chatmaxima_script']);
+        add_filter('script_loader_tag', [$this, 'add_no_optimize_attributes'], 10, 2);
+        add_filter('wp_inline_script_attributes', [$this, 'add_no_optimize_inline_attributes']);
     }
 
     /**
-     * Add ChatMaxima chatbot script to frontend and admin
+     * Enqueue the ChatMaxima widget script on the frontend
      */
-    public function add_chatmaxima_script()
+    public function enqueue_chatmaxima_script()
     {
-        // Only render the widget on the frontend when it has been explicitly installed
+        // Only load the widget on the frontend when it has been explicitly installed
         $channel_alias = get_option('chatmaxima_installed_channel', '');
 
-        // Don't output script if no channel is available
+        // Don't load the script if no channel is available
         if (empty($channel_alias))
         {
             return;
         }
 
-        // Use attributes to exclude from caching plugin optimization:
-        // - data-no-optimize="1" : WP Rocket, LiteSpeed Cache
-        // - data-cfasync="false" : Cloudflare Rocket Loader
-        // - data-pagespeed-no-defer : PageSpeed module
-        // - class="no-defer" : Various caching plugins
-        ?>
-        <script data-no-optimize="1" data-cfasync="false" data-pagespeed-no-defer class="chatmaxima-config">
-            window.chatmaximaConfig = { token: '<?php echo esc_js($channel_alias); ?>' };
-        </script>
-        <script src="https://widget.chatmaxima.com/embed.min.js" id="chatmaxima-widget-<?php echo esc_attr($channel_alias); ?>" data-no-optimize="1" data-cfasync="false" data-pagespeed-no-defer class="chatmaxima-widget"></script>
-        <?php
+        wp_enqueue_script('chatmaxima-widget', 'https://widget.chatmaxima.com/embed.min.js', [], CHATMAXIMA_VERSION, true);
+        wp_add_inline_script('chatmaxima-widget', 'window.chatmaximaConfig = ' . wp_json_encode(['token' => $channel_alias]) . ';', 'before');
+    }
+
+    /**
+     * Keep caching / optimization plugins from deferring or combining the widget script:
+     * data-no-optimize (WP Rocket, LiteSpeed), data-cfasync (Cloudflare Rocket Loader),
+     * data-pagespeed-no-defer (PageSpeed module)
+     */
+    public function add_no_optimize_attributes($tag, $handle)
+    {
+        if ($handle !== 'chatmaxima-widget')
+        {
+            return $tag;
+        }
+        return str_replace(' src=', ' data-no-optimize="1" data-cfasync="false" data-pagespeed-no-defer src=', $tag);
+    }
+
+    /**
+     * Same attributes on the inline config script that sets window.chatmaximaConfig
+     */
+    public function add_no_optimize_inline_attributes($attributes)
+    {
+        if (isset($attributes['id']) && $attributes['id'] === 'chatmaxima-widget-js-before')
+        {
+            $attributes['data-no-optimize'] = '1';
+            $attributes['data-cfasync'] = 'false';
+            $attributes['data-pagespeed-no-defer'] = true;
+        }
+        return $attributes;
     }
 }
 
@@ -120,8 +141,8 @@ function chatmaxima_deactivation()
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'chatmaxima_plugin_action_links');
 function chatmaxima_plugin_action_links($links)
 {
-    $settings_link = '<a href="' . admin_url('admin.php?page=chatmaxima-settings') . '">' . __('Settings', 'chatmaxima-ai-chatbot') . '</a>';
-    $knowledge_link = '<a href="' . admin_url('admin.php?page=chatmaxima-knowledge-sources') . '">' . __('Knowledge Sources', 'chatmaxima-ai-chatbot') . '</a>';
+    $settings_link = '<a href="' . esc_url(admin_url('admin.php?page=chatmaxima-settings')) . '">' . esc_html__('Settings', 'chatmaxima-ai-chatbot') . '</a>';
+    $knowledge_link = '<a href="' . esc_url(admin_url('admin.php?page=chatmaxima-knowledge-sources')) . '">' . esc_html__('Knowledge Sources', 'chatmaxima-ai-chatbot') . '</a>';
 
     array_unshift($links, $settings_link, $knowledge_link);
     return $links;
@@ -133,8 +154,8 @@ function chatmaxima_plugin_row_meta($links, $file)
 {
     if (plugin_basename(__FILE__) === $file)
     {
-        $links[] = '<a href="https://chatmaxima.com/docs/" target="_blank">' . __('Documentation', 'chatmaxima-ai-chatbot') . '</a>';
-        $links[] = '<a href="https://chatmaxima.com/support/" target="_blank">' . __('Support', 'chatmaxima-ai-chatbot') . '</a>';
+        $links[] = '<a href="https://docs.chatmaxima.com/" target="_blank" rel="noopener noreferrer">' . __('Documentation', 'chatmaxima-ai-chatbot') . '</a>';
+        $links[] = '<a href="https://chatmaxima.com/contact/" target="_blank" rel="noopener noreferrer">' . __('Support', 'chatmaxima-ai-chatbot') . '</a>';
     }
     return $links;
 }

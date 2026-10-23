@@ -14,58 +14,51 @@ if (!defined('WP_UNINSTALL_PLUGIN'))
     exit;
 }
 
-// Delete plugin options
-delete_option('chatmaxima_token_id');
-delete_option('chatmaxima_theme_color');
-delete_option('chatmaxima_social_media');
+/**
+ * Remove every ChatMaxima option, transient and post meta row from the current site
+ */
+function chatmaxima_uninstall_site()
+{
+    global $wpdb;
 
-// Delete API-related options
-delete_option('chatmaxima_access_token');
-delete_option('chatmaxima_refresh_token');
-delete_option('chatmaxima_token_expiry');
-delete_option('chatmaxima_user_info');
+    $options = [
+        'chatmaxima_token_id',
+        'chatmaxima_theme_color',
+        'chatmaxima_social_media',
+        'chatmaxima_access_token',
+        'chatmaxima_refresh_token',
+        'chatmaxima_token_expiry',
+        'chatmaxima_user_info',
+        'chatmaxima_knowledge_source_alias',
+        'chatmaxima_auto_sync',
+        'chatmaxima_sync_post_types',
+        'chatmaxima_selected_team',
+        'chatmaxima_channel_alias',
+        'chatmaxima_installed_channel',
+    ];
+    foreach ($options as $option)
+    {
+        delete_option($option);
+    }
 
-// Delete knowledge source options
-delete_option('chatmaxima_knowledge_source_alias');
-delete_option('chatmaxima_auto_sync');
-delete_option('chatmaxima_sync_post_types');
-delete_option('chatmaxima_selected_team');
+    delete_transient('chatmaxima_knowledge_sources');
 
-// Delete transients
-delete_transient('chatmaxima_knowledge_sources');
+    // Post meta written by content sync (_chatmaxima_sync_status, _chatmaxima_sync_date, ...)
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-off cleanup on uninstall
+    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE %s", $wpdb->esc_like('_chatmaxima_') . '%'));
+}
 
-// Delete post meta
-global $wpdb;
-$wpdb->query("DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE '_chatmaxima_%'");
-
-// For multisite installations, delete options from all sites
 if (is_multisite())
 {
-    $blog_ids = $wpdb->get_col("SELECT blog_id FROM $wpdb->blogs");
-
-    foreach ($blog_ids as $blog_id)
+    $chatmaxima_site_ids = get_sites(['fields' => 'ids', 'number' => 0]);
+    foreach ($chatmaxima_site_ids as $chatmaxima_site_id)
     {
-        switch_to_blog($blog_id);
-
-        // Delete all options
-        delete_option('chatmaxima_token_id');
-        delete_option('chatmaxima_theme_color');
-        delete_option('chatmaxima_social_media');
-        delete_option('chatmaxima_access_token');
-        delete_option('chatmaxima_refresh_token');
-        delete_option('chatmaxima_token_expiry');
-        delete_option('chatmaxima_user_info');
-        delete_option('chatmaxima_knowledge_source_alias');
-        delete_option('chatmaxima_auto_sync');
-        delete_option('chatmaxima_sync_post_types');
-        delete_option('chatmaxima_selected_team');
-
-        // Delete transients
-        delete_transient('chatmaxima_knowledge_sources');
-
-        // Delete post meta
-        $wpdb->query("DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE '_chatmaxima_%'");
-
+        switch_to_blog($chatmaxima_site_id);
+        chatmaxima_uninstall_site();
         restore_current_blog();
     }
+}
+else
+{
+    chatmaxima_uninstall_site();
 }

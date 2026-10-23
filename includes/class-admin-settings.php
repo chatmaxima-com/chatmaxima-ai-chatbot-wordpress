@@ -178,12 +178,12 @@ class ChatMaxima_Admin_Settings
         );
 
         // Register settings
-        register_setting('chatmaxima_settings', 'chatmaxima_token_id');
-        register_setting('chatmaxima_settings', 'chatmaxima_theme_color');
-        register_setting('chatmaxima_settings', 'chatmaxima_social_media');
-        register_setting('chatmaxima_settings', 'chatmaxima_knowledge_source_alias');
-        register_setting('chatmaxima_settings', 'chatmaxima_auto_sync');
-        register_setting('chatmaxima_settings', 'chatmaxima_sync_post_types');
+        register_setting('chatmaxima_settings', 'chatmaxima_token_id', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('chatmaxima_settings', 'chatmaxima_theme_color', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitize_theme_color']]);
+        register_setting('chatmaxima_settings', 'chatmaxima_social_media', ['type' => 'array', 'sanitize_callback' => [$this, 'sanitize_text_array']]);
+        register_setting('chatmaxima_settings', 'chatmaxima_knowledge_source_alias', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('chatmaxima_settings', 'chatmaxima_auto_sync', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
+        register_setting('chatmaxima_settings', 'chatmaxima_sync_post_types', ['type' => 'array', 'sanitize_callback' => [$this, 'sanitize_post_types']]);
 
         // Token ID field
         add_settings_field(
@@ -214,11 +214,54 @@ class ChatMaxima_Admin_Settings
     }
 
     /**
+     * Sanitize the widget theme colour, falling back to the default when it is not a hex colour
+     */
+    public function sanitize_theme_color($value)
+    {
+        $color = sanitize_hex_color($value);
+        if (empty($color))
+        {
+            return '#007bff';
+        }
+        return $color;
+    }
+
+    /**
+     * Sanitize an array of text values keyed by platform (social media handles)
+     */
+    public function sanitize_text_array($value)
+    {
+        $clean = [];
+        foreach ((array) $value as $key => $item)
+        {
+            $clean[sanitize_key($key)] = sanitize_text_field($item);
+        }
+        return $clean;
+    }
+
+    /**
+     * Keep only registered post type names in the sync list
+     */
+    public function sanitize_post_types($value)
+    {
+        $clean = [];
+        foreach ((array) $value as $post_type)
+        {
+            $post_type = sanitize_key($post_type);
+            if (post_type_exists($post_type))
+            {
+                $clean[] = $post_type;
+            }
+        }
+        return $clean;
+    }
+
+    /**
      * API section callback
      */
     public function api_section_callback()
     {
-        echo '<p>' . __('Connect to ChatMaxima API to manage knowledge sources and sync content.', 'chatmaxima-ai-chatbot') . '</p>';
+        echo '<p>' . esc_html__('Connect to ChatMaxima API to manage knowledge sources and sync content.', 'chatmaxima-ai-chatbot') . '</p>';
     }
 
     /**
@@ -226,7 +269,7 @@ class ChatMaxima_Admin_Settings
      */
     public function knowledge_section_callback()
     {
-        echo '<p>' . __('Select or create a knowledge source to store your WordPress content.', 'chatmaxima-ai-chatbot') . '</p>';
+        echo '<p>' . esc_html__('Select or create a knowledge source to store your WordPress content.', 'chatmaxima-ai-chatbot') . '</p>';
     }
 
     /**
@@ -234,7 +277,7 @@ class ChatMaxima_Admin_Settings
      */
     public function sync_section_callback()
     {
-        echo '<p>' . __('Sync your WordPress posts and pages to the selected knowledge source.', 'chatmaxima-ai-chatbot') . '</p>';
+        echo '<p>' . esc_html__('Sync your WordPress posts and pages to the selected knowledge source.', 'chatmaxima-ai-chatbot') . '</p>';
     }
 
     /**
@@ -242,7 +285,7 @@ class ChatMaxima_Admin_Settings
      */
     public function chatbot_section_callback()
     {
-        echo '<p>' . __('Configure your chatbot appearance and behavior.', 'chatmaxima-ai-chatbot') . '</p>';
+        echo '<p>' . esc_html__('Configure your chatbot appearance and behavior.', 'chatmaxima-ai-chatbot') . '</p>';
     }
 
     /**
@@ -253,7 +296,7 @@ class ChatMaxima_Admin_Settings
         $token_id = get_option('chatmaxima_token_id', '');
         ?>
         <input type="text" id="chatmaxima_token_id" name="chatmaxima_token_id" value="<?php echo esc_attr($token_id); ?>" class="regular-text" />
-        <p class="description"><?php _e('Enter your ChatMaxima Token ID for the chatbot widget.', 'chatmaxima-ai-chatbot'); ?></p>
+        <p class="description"><?php esc_html_e('Enter your ChatMaxima Token ID for the chatbot widget.', 'chatmaxima-ai-chatbot'); ?></p>
         <?php
     }
 
@@ -265,7 +308,7 @@ class ChatMaxima_Admin_Settings
         $theme_color = get_option('chatmaxima_theme_color', '#007bff');
         ?>
         <input type="text" id="chatmaxima_theme_color" name="chatmaxima_theme_color" value="<?php echo esc_attr($theme_color); ?>" class="chatmaxima-color-field" />
-        <p class="description"><?php _e('Choose the theme color for your chatbot.', 'chatmaxima-ai-chatbot'); ?></p>
+        <p class="description"><?php esc_html_e('Choose the theme color for your chatbot.', 'chatmaxima-ai-chatbot'); ?></p>
         <?php
     }
 
@@ -296,7 +339,7 @@ class ChatMaxima_Admin_Settings
             echo '</tr>';
         }
         echo '</table>';
-        echo '<p class="description">' . __('Enter your social media handles and contact information.', 'chatmaxima-ai-chatbot') . '</p>';
+        echo '<p class="description">' . esc_html__('Enter your social media handles and contact information.', 'chatmaxima-ai-chatbot') . '</p>';
     }
 
     /**
@@ -311,11 +354,11 @@ class ChatMaxima_Admin_Settings
         $sync_post_types = get_option('chatmaxima_sync_post_types', ['post', 'page']);
         ?>
         <div class="wrap chatmaxima-settings-wrap">
-            <h1><?php _e('ChatMaxima AI Chatbot Settings', 'chatmaxima-ai-chatbot'); ?></h1>
+            <h1><?php esc_html_e('ChatMaxima AI Chatbot Settings', 'chatmaxima-ai-chatbot'); ?></h1>
 
             <!-- API Connection Section -->
             <div class="chatmaxima-card">
-                <h2><?php _e('API Connection', 'chatmaxima-ai-chatbot'); ?></h2>
+                <h2><?php esc_html_e('API Connection', 'chatmaxima-ai-chatbot'); ?></h2>
 
                 <div id="chatmaxima-connection-status" class="chatmaxima-status <?php echo $is_authenticated ? 'connected' : 'disconnected'; ?>">
                     <span class="status-indicator"></span>
@@ -323,15 +366,17 @@ class ChatMaxima_Admin_Settings
                         <?php
                         if ($is_authenticated && !empty($user_info))
                         {
-                            printf(__('Connected as %s (%s)', 'chatmaxima-ai-chatbot'), esc_html($user_info['name']), esc_html($user_info['email']));
+                            /* translators: 1: account name, 2: account email */
+                            printf(esc_html__('Connected as %1$s (%2$s)', 'chatmaxima-ai-chatbot'), esc_html($user_info['name']), esc_html($user_info['email']));
                             if (!empty($user_info['team_alias']))
                             {
-                                echo '<br><small>' . sprintf(__('Workspace ID: %s', 'chatmaxima-ai-chatbot'), esc_html($user_info['team_alias'])) . '</small>';
+                                /* translators: %s: ChatMaxima workspace ID */
+                                echo '<br><small>' . sprintf(esc_html__('Workspace ID: %s', 'chatmaxima-ai-chatbot'), esc_html($user_info['team_alias'])) . '</small>';
                             }
                         }
                         else
                         {
-                            _e('Not connected', 'chatmaxima-ai-chatbot');
+                            esc_html_e('Not connected', 'chatmaxima-ai-chatbot');
                         }
                         ?>
                     </span>
@@ -339,41 +384,41 @@ class ChatMaxima_Admin_Settings
 
                 <?php if (!$is_authenticated): ?>
                 <div id="chatmaxima-login-form" class="chatmaxima-login-form">
-                    <p><?php _e('Enter your ChatMaxima credentials to connect:', 'chatmaxima-ai-chatbot'); ?></p>
+                    <p><?php esc_html_e('Enter your ChatMaxima credentials to connect:', 'chatmaxima-ai-chatbot'); ?></p>
                     <table class="form-table">
                         <tr>
-                            <th><label for="chatmaxima_email"><?php _e('Email', 'chatmaxima-ai-chatbot'); ?></label></th>
+                            <th><label for="chatmaxima_email"><?php esc_html_e('Email', 'chatmaxima-ai-chatbot'); ?></label></th>
                             <td><input type="email" id="chatmaxima_email" class="regular-text" /></td>
                         </tr>
                         <tr>
-                            <th><label for="chatmaxima_password"><?php _e('Password', 'chatmaxima-ai-chatbot'); ?></label></th>
+                            <th><label for="chatmaxima_password"><?php esc_html_e('Password', 'chatmaxima-ai-chatbot'); ?></label></th>
                             <td><input type="password" id="chatmaxima_password" class="regular-text" /></td>
                         </tr>
                     </table>
                     <p>
-                        <button type="button" id="chatmaxima-login-btn" class="button button-primary"><?php _e('Connect', 'chatmaxima-ai-chatbot'); ?></button>
+                        <button type="button" id="chatmaxima-login-btn" class="button button-primary"><?php esc_html_e('Connect', 'chatmaxima-ai-chatbot'); ?></button>
                         <span id="chatmaxima-login-message" class="chatmaxima-message"></span>
                     </p>
                 </div>
                 <?php else: ?>
                 <p>
-                    <button type="button" id="chatmaxima-logout-btn" class="button"><?php _e('Disconnect', 'chatmaxima-ai-chatbot'); ?></button>
-                    <button type="button" id="chatmaxima-test-btn" class="button"><?php _e('Test Connection', 'chatmaxima-ai-chatbot'); ?></button>
+                    <button type="button" id="chatmaxima-logout-btn" class="button"><?php esc_html_e('Disconnect', 'chatmaxima-ai-chatbot'); ?></button>
+                    <button type="button" id="chatmaxima-test-btn" class="button"><?php esc_html_e('Test Connection', 'chatmaxima-ai-chatbot'); ?></button>
                     <span id="chatmaxima-connection-message" class="chatmaxima-message"></span>
                 </p>
 
                 <!-- Workspace Selection -->
                 <div class="chatmaxima-team-selector" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-                    <h3><?php _e('Workspace Selection', 'chatmaxima-ai-chatbot'); ?></h3>
-                    <p class="description"><?php _e('Select the workspace to use for knowledge sources and content sync.', 'chatmaxima-ai-chatbot'); ?></p>
+                    <h3><?php esc_html_e('Workspace Selection', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <p class="description"><?php esc_html_e('Select the workspace to use for knowledge sources and content sync.', 'chatmaxima-ai-chatbot'); ?></p>
                     <table class="form-table">
                         <tr>
-                            <th><label for="chatmaxima_team"><?php _e('Workspace', 'chatmaxima-ai-chatbot'); ?></label></th>
+                            <th><label for="chatmaxima_team"><?php esc_html_e('Workspace', 'chatmaxima-ai-chatbot'); ?></label></th>
                             <td>
                                 <select id="chatmaxima_team" class="regular-text">
-                                    <option value=""><?php _e('-- Loading workspaces... --', 'chatmaxima-ai-chatbot'); ?></option>
+                                    <option value=""><?php esc_html_e('-- Loading workspaces... --', 'chatmaxima-ai-chatbot'); ?></option>
                                 </select>
-                                <button type="button" id="chatmaxima-refresh-teams-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
+                                <button type="button" id="chatmaxima-refresh-teams-btn" class="button"><?php esc_html_e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
                                 <span id="chatmaxima-team-message" class="chatmaxima-message"></span>
                             </td>
                         </tr>
@@ -385,31 +430,31 @@ class ChatMaxima_Admin_Settings
             <?php if ($is_authenticated): ?>
             <!-- Knowledge Source Section -->
             <div class="chatmaxima-card">
-                <h2><?php _e('Knowledge Source', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Select an existing knowledge source or create a new one to store your WordPress content.', 'chatmaxima-ai-chatbot'); ?></p>
+                <h2><?php esc_html_e('Knowledge Source', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Select an existing knowledge source or create a new one to store your WordPress content.', 'chatmaxima-ai-chatbot'); ?></p>
 
                 <table class="form-table">
                     <tr>
-                        <th><label for="chatmaxima_knowledge_source"><?php _e('Knowledge Source', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_knowledge_source"><?php esc_html_e('Knowledge Source', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <select id="chatmaxima_knowledge_source" class="regular-text">
-                                <option value=""><?php _e('-- Select Knowledge Source --', 'chatmaxima-ai-chatbot'); ?></option>
+                                <option value=""><?php esc_html_e('-- Select Knowledge Source --', 'chatmaxima-ai-chatbot'); ?></option>
                             </select>
-                            <button type="button" id="chatmaxima-refresh-ks-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
-                            <p class="description"><?php _e('Select the knowledge source where your content will be synced.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <button type="button" id="chatmaxima-refresh-ks-btn" class="button"><?php esc_html_e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
+                            <p class="description"><?php esc_html_e('Select the knowledge source where your content will be synced.', 'chatmaxima-ai-chatbot'); ?></p>
                         </td>
                     </tr>
                 </table>
 
                 <div class="chatmaxima-create-ks">
-                    <h3><?php _e('Create New Knowledge Source', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <h3><?php esc_html_e('Create New Knowledge Source', 'chatmaxima-ai-chatbot'); ?></h3>
                     <table class="form-table">
                         <tr>
-                            <th><label for="chatmaxima_new_ks_name"><?php _e('Name', 'chatmaxima-ai-chatbot'); ?></label></th>
+                            <th><label for="chatmaxima_new_ks_name"><?php esc_html_e('Name', 'chatmaxima-ai-chatbot'); ?></label></th>
                             <td><input type="text" id="chatmaxima_new_ks_name" class="regular-text" placeholder="<?php esc_attr_e('e.g., My WordPress Site', 'chatmaxima-ai-chatbot'); ?>" /></td>
                         </tr>
                         <tr>
-                            <th><label for="chatmaxima_new_ks_llm"><?php _e('LLM Type', 'chatmaxima-ai-chatbot'); ?></label></th>
+                            <th><label for="chatmaxima_new_ks_llm"><?php esc_html_e('LLM Type', 'chatmaxima-ai-chatbot'); ?></label></th>
                             <td>
                                 <select id="chatmaxima_new_ks_llm">
                                     <option value="openai">OpenAI</option>
@@ -420,7 +465,7 @@ class ChatMaxima_Admin_Settings
                         </tr>
                     </table>
                     <p>
-                        <button type="button" id="chatmaxima-create-ks-btn" class="button button-primary"><?php _e('Create Knowledge Source', 'chatmaxima-ai-chatbot'); ?></button>
+                        <button type="button" id="chatmaxima-create-ks-btn" class="button button-primary"><?php esc_html_e('Create Knowledge Source', 'chatmaxima-ai-chatbot'); ?></button>
                         <span id="chatmaxima-create-ks-message" class="chatmaxima-message"></span>
                     </p>
                 </div>
@@ -428,21 +473,20 @@ class ChatMaxima_Admin_Settings
 
             <!-- Content Sync Section -->
             <div class="chatmaxima-card">
-                <h2><?php _e('Content Sync', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Sync your WordPress posts and pages to the selected knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
+                <h2><?php esc_html_e('Content Sync', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Sync your WordPress posts and pages to the selected knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
 
                 <table class="form-table">
                     <tr>
-                        <th><label><?php _e('Post Types to Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label><?php esc_html_e('Post Types to Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <?php
                             $post_types = get_post_types(['public' => true], 'objects');
                             foreach ($post_types as $post_type)
                             {
                                 if ($post_type->name === 'attachment') continue;
-                                $checked = in_array($post_type->name, (array)$sync_post_types) ? 'checked' : '';
                                 echo '<label style="display: block; margin-bottom: 5px;">';
-                                echo '<input type="checkbox" name="chatmaxima_sync_post_types[]" value="' . esc_attr($post_type->name) . '" ' . $checked . ' class="chatmaxima-sync-post-type" /> ';
+                                echo '<input type="checkbox" name="chatmaxima_sync_post_types[]" value="' . esc_attr($post_type->name) . '" ' . checked(in_array($post_type->name, (array) $sync_post_types, true), true, false) . ' class="chatmaxima-sync-post-type" /> ';
                                 echo esc_html($post_type->labels->name);
                                 echo '</label>';
                             }
@@ -450,29 +494,29 @@ class ChatMaxima_Admin_Settings
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="chatmaxima_auto_sync"><?php _e('Auto Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_auto_sync"><?php esc_html_e('Auto Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <label>
                                 <input type="checkbox" id="chatmaxima_auto_sync" name="chatmaxima_auto_sync" value="1" <?php checked($auto_sync, true); ?> />
-                                <?php _e('Automatically sync new posts when published', 'chatmaxima-ai-chatbot'); ?>
+                                <?php esc_html_e('Automatically sync new posts when published', 'chatmaxima-ai-chatbot'); ?>
                             </label>
                         </td>
                     </tr>
                 </table>
 
                 <div class="chatmaxima-sync-actions">
-                    <h3><?php _e('Bulk Sync', 'chatmaxima-ai-chatbot'); ?></h3>
-                    <p><?php _e('Sync all published content to the selected knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
+                    <h3><?php esc_html_e('Bulk Sync', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <p><?php esc_html_e('Sync all published content to the selected knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
 
                     <div id="chatmaxima-sync-progress" class="chatmaxima-progress" style="display: none;">
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: 0%;"></div>
                         </div>
-                        <p class="progress-text"><?php _e('Syncing...', 'chatmaxima-ai-chatbot'); ?> <span class="progress-count">0/0</span></p>
+                        <p class="progress-text"><?php esc_html_e('Syncing...', 'chatmaxima-ai-chatbot'); ?> <span class="progress-count">0/0</span></p>
                     </div>
 
                     <p>
-                        <button type="button" id="chatmaxima-sync-all-btn" class="button button-primary"><?php _e('Sync All Content', 'chatmaxima-ai-chatbot'); ?></button>
+                        <button type="button" id="chatmaxima-sync-all-btn" class="button button-primary"><?php esc_html_e('Sync All Content', 'chatmaxima-ai-chatbot'); ?></button>
                         <span id="chatmaxima-sync-message" class="chatmaxima-message"></span>
                     </p>
                 </div>
@@ -486,51 +530,51 @@ class ChatMaxima_Admin_Settings
             ?>
             <!-- Web Channels Section -->
             <div class="chatmaxima-card">
-                <h2><?php _e('Chatbot Widget', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Select a web channel and install the chatbot widget on your WordPress site.', 'chatmaxima-ai-chatbot'); ?></p>
+                <h2><?php esc_html_e('Chatbot Widget', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Select a web channel and install the chatbot widget on your WordPress site.', 'chatmaxima-ai-chatbot'); ?></p>
 
                 <table class="form-table">
                     <tr>
-                        <th><label for="chatmaxima_channel"><?php _e('Channel', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_channel"><?php esc_html_e('Channel', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <select id="chatmaxima_channel" class="regular-text">
-                                <option value=""><?php _e('-- Loading channels... --', 'chatmaxima-ai-chatbot'); ?></option>
+                                <option value=""><?php esc_html_e('-- Loading channels... --', 'chatmaxima-ai-chatbot'); ?></option>
                             </select>
-                            <button type="button" id="chatmaxima-refresh-channels-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
+                            <button type="button" id="chatmaxima-refresh-channels-btn" class="button"><?php esc_html_e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
                             <span id="chatmaxima-channel-message" class="chatmaxima-message"></span>
-                            <p class="description"><?php _e('Select the web channel to embed on your WordPress site.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <p class="description"><?php esc_html_e('Select the web channel to embed on your WordPress site.', 'chatmaxima-ai-chatbot'); ?></p>
                         </td>
                     </tr>
                 </table>
 
                 <!-- Widget Script Preview -->
                 <div id="chatmaxima-widget-script" style="display: none; margin-top: 20px;">
-                    <h3><?php _e('Widget Script', 'chatmaxima-ai-chatbot'); ?></h3>
-                    <p class="description"><?php _e('This script will be automatically added to your website footer when installed.', 'chatmaxima-ai-chatbot'); ?></p>
+                    <h3><?php esc_html_e('Widget Script', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <p class="description"><?php esc_html_e('This script will be automatically added to your website footer when installed.', 'chatmaxima-ai-chatbot'); ?></p>
                     <div style="position: relative;">
                         <pre id="chatmaxima-script-code" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 13px;"></pre>
-                        <button type="button" id="chatmaxima-copy-script-btn" class="button" style="position: absolute; top: 10px; right: 10px;"><?php _e('Copy', 'chatmaxima-ai-chatbot'); ?></button>
+                        <button type="button" id="chatmaxima-copy-script-btn" class="button" style="position: absolute; top: 10px; right: 10px;"><?php esc_html_e('Copy', 'chatmaxima-ai-chatbot'); ?></button>
                     </div>
 
                     <div style="margin-top: 15px; display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start;">
                         <!-- Admin Playground Button -->
                         <div style="flex: 1; min-width: 200px; padding: 15px; background: #f0f6fc; border: 1px solid #0366d6; border-radius: 6px;">
-                            <h4 style="margin: 0 0 8px 0; color: #0366d6;"><?php _e('Admin Preview', 'chatmaxima-ai-chatbot'); ?></h4>
-                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #586069;"><?php _e('Test the widget in this admin area only. Visitors won\'t see it.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <h4 style="margin: 0 0 8px 0; color: #0366d6;"><?php esc_html_e('Admin Preview', 'chatmaxima-ai-chatbot'); ?></h4>
+                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #586069;"><?php esc_html_e('Test the widget in this admin area only. Visitors won\'t see it.', 'chatmaxima-ai-chatbot'); ?></p>
                             <button type="button" id="chatmaxima-preview-widget-btn" class="button button-secondary">
-                                <?php _e('Preview Widget', 'chatmaxima-ai-chatbot'); ?>
+                                <?php esc_html_e('Preview Widget', 'chatmaxima-ai-chatbot'); ?>
                             </button>
                         </div>
 
                         <!-- Enable for Users Button -->
                         <div style="flex: 1; min-width: 200px; padding: 15px; background: <?php echo $is_widget_installed ? '#d4edda' : '#fff3cd'; ?>; border: 1px solid <?php echo $is_widget_installed ? '#c3e6cb' : '#ffc107'; ?>; border-radius: 6px;">
-                            <h4 style="margin: 0 0 8px 0; color: <?php echo $is_widget_installed ? '#155724' : '#856404'; ?>;"><?php _e('Live on Site', 'chatmaxima-ai-chatbot'); ?></h4>
-                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #586069;"><?php _e('Enable the widget for all visitors on your website.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <h4 style="margin: 0 0 8px 0; color: <?php echo $is_widget_installed ? '#155724' : '#856404'; ?>;"><?php esc_html_e('Live on Site', 'chatmaxima-ai-chatbot'); ?></h4>
+                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #586069;"><?php esc_html_e('Enable the widget for all visitors on your website.', 'chatmaxima-ai-chatbot'); ?></p>
                             <button type="button" id="chatmaxima-install-widget-btn" class="button button-primary" <?php echo $is_widget_installed ? 'style="display:none;"' : ''; ?>>
-                                <?php _e('Enable for Visitors', 'chatmaxima-ai-chatbot'); ?>
+                                <?php esc_html_e('Enable for Visitors', 'chatmaxima-ai-chatbot'); ?>
                             </button>
                             <button type="button" id="chatmaxima-uninstall-widget-btn" class="button button-secondary" <?php echo !$is_widget_installed ? 'style="display:none;"' : ''; ?>>
-                                <?php _e('Disable for Visitors', 'chatmaxima-ai-chatbot'); ?>
+                                <?php esc_html_e('Disable for Visitors', 'chatmaxima-ai-chatbot'); ?>
                             </button>
                         </div>
                     </div>
@@ -539,11 +583,11 @@ class ChatMaxima_Admin_Settings
 
                     <?php if ($is_widget_installed): ?>
                     <div id="chatmaxima-widget-status" style="margin-top: 15px; padding: 10px 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
-                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is enabled and visible to all visitors on your site.', 'chatmaxima-ai-chatbot'); ?>
+                        <strong><?php esc_html_e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php esc_html_e('Widget is enabled and visible to all visitors on your site.', 'chatmaxima-ai-chatbot'); ?>
                     </div>
                     <?php else: ?>
                     <div id="chatmaxima-widget-status" style="display: none; margin-top: 15px; padding: 10px 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
-                        <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php _e('Widget is enabled and visible to all visitors on your site.', 'chatmaxima-ai-chatbot'); ?>
+                        <strong><?php esc_html_e('Status:', 'chatmaxima-ai-chatbot'); ?></strong> <?php esc_html_e('Widget is enabled and visible to all visitors on your site.', 'chatmaxima-ai-chatbot'); ?>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -561,61 +605,61 @@ class ChatMaxima_Admin_Settings
         $is_authenticated = $this->api_client->is_authenticated();
         ?>
         <div class="wrap chatmaxima-settings-wrap">
-            <h1><?php _e('Knowledge Sources', 'chatmaxima-ai-chatbot'); ?></h1>
+            <h1><?php esc_html_e('Knowledge Sources', 'chatmaxima-ai-chatbot'); ?></h1>
 
             <?php if (!$is_authenticated): ?>
             <div class="chatmaxima-card">
-                <h2><?php _e('Not Connected', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Please connect to ChatMaxima first.', 'chatmaxima-ai-chatbot'); ?></p>
-                <p><a href="<?php echo admin_url('admin.php?page=chatmaxima-settings'); ?>" class="button button-primary"><?php _e('Go to Settings', 'chatmaxima-ai-chatbot'); ?></a></p>
+                <h2><?php esc_html_e('Not Connected', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Please connect to ChatMaxima first.', 'chatmaxima-ai-chatbot'); ?></p>
+                <p><a href="<?php echo esc_url(admin_url('admin.php?page=chatmaxima-settings')); ?>" class="button button-primary"><?php esc_html_e('Go to Settings', 'chatmaxima-ai-chatbot'); ?></a></p>
             </div>
             <?php else: ?>
             <div class="chatmaxima-card">
-                <h2><?php _e('Your Knowledge Sources', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Manage your knowledge sources for AI training.', 'chatmaxima-ai-chatbot'); ?></p>
+                <h2><?php esc_html_e('Your Knowledge Sources', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Manage your knowledge sources for AI training.', 'chatmaxima-ai-chatbot'); ?></p>
 
                 <table class="form-table">
                     <tr>
-                        <th><label for="chatmaxima_knowledge_source"><?php _e('Select Knowledge Source', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_knowledge_source"><?php esc_html_e('Select Knowledge Source', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <select id="chatmaxima_knowledge_source" class="regular-text">
-                                <option value=""><?php _e('-- Select Knowledge Source --', 'chatmaxima-ai-chatbot'); ?></option>
+                                <option value=""><?php esc_html_e('-- Select Knowledge Source --', 'chatmaxima-ai-chatbot'); ?></option>
                             </select>
-                            <button type="button" id="chatmaxima-refresh-ks-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
+                            <button type="button" id="chatmaxima-refresh-ks-btn" class="button"><?php esc_html_e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
                         </td>
                     </tr>
                 </table>
 
                 <div id="chatmaxima-ks-details" class="chatmaxima-ks-details" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-                    <h3><?php _e('Knowledge Source Details', 'chatmaxima-ai-chatbot'); ?></h3>
-                    <p><strong><?php _e('Name:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-name">-</span></p>
-                    <p><strong><?php _e('Documents:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-docs">-</span></p>
-                    <p><strong><?php _e('Storage:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-storage">-</span></p>
-                    <p><strong><?php _e('Type:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-type">-</span></p>
+                    <h3><?php esc_html_e('Knowledge Source Details', 'chatmaxima-ai-chatbot'); ?></h3>
+                    <p><strong><?php esc_html_e('Name:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-name">-</span></p>
+                    <p><strong><?php esc_html_e('Documents:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-docs">-</span></p>
+                    <p><strong><?php esc_html_e('Storage:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-storage">-</span></p>
+                    <p><strong><?php esc_html_e('Type:', 'chatmaxima-ai-chatbot'); ?></strong> <span id="ks-detail-type">-</span></p>
                 </div>
             </div>
 
             <div class="chatmaxima-card">
-                <h2><?php _e('Create New Knowledge Source', 'chatmaxima-ai-chatbot'); ?></h2>
+                <h2><?php esc_html_e('Create New Knowledge Source', 'chatmaxima-ai-chatbot'); ?></h2>
                 <table class="form-table">
                     <tr>
-                        <th><label for="chatmaxima_new_ks_name"><?php _e('Name', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_new_ks_name"><?php esc_html_e('Name', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td><input type="text" id="chatmaxima_new_ks_name" class="regular-text" placeholder="<?php esc_attr_e('e.g., My WordPress Site', 'chatmaxima-ai-chatbot'); ?>" /></td>
                     </tr>
                     <tr>
-                        <th><label for="chatmaxima_new_ks_llm"><?php _e('LLM Type', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_new_ks_llm"><?php esc_html_e('LLM Type', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <select id="chatmaxima_new_ks_llm">
                                 <option value="openai">OpenAI</option>
                                 <option value="claude">Claude</option>
                                 <option value="gemini">Gemini</option>
                             </select>
-                            <p class="description"><?php _e('Select the AI model to use for this knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
+                            <p class="description"><?php esc_html_e('Select the AI model to use for this knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
                         </td>
                     </tr>
                 </table>
                 <p>
-                    <button type="button" id="chatmaxima-create-ks-btn" class="button button-primary"><?php _e('Create Knowledge Source', 'chatmaxima-ai-chatbot'); ?></button>
+                    <button type="button" id="chatmaxima-create-ks-btn" class="button button-primary"><?php esc_html_e('Create Knowledge Source', 'chatmaxima-ai-chatbot'); ?></button>
                     <span id="chatmaxima-create-ks-message" class="chatmaxima-message"></span>
                 </p>
             </div>
@@ -635,45 +679,44 @@ class ChatMaxima_Admin_Settings
         $sync_post_types = get_option('chatmaxima_sync_post_types', ['post', 'page']);
         ?>
         <div class="wrap chatmaxima-settings-wrap">
-            <h1><?php _e('Content Sync', 'chatmaxima-ai-chatbot'); ?></h1>
+            <h1><?php esc_html_e('Content Sync', 'chatmaxima-ai-chatbot'); ?></h1>
 
             <?php if (!$is_authenticated): ?>
             <div class="chatmaxima-card">
-                <h2><?php _e('Not Connected', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Please connect to ChatMaxima first.', 'chatmaxima-ai-chatbot'); ?></p>
-                <p><a href="<?php echo admin_url('admin.php?page=chatmaxima-settings'); ?>" class="button button-primary"><?php _e('Go to Settings', 'chatmaxima-ai-chatbot'); ?></a></p>
+                <h2><?php esc_html_e('Not Connected', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Please connect to ChatMaxima first.', 'chatmaxima-ai-chatbot'); ?></p>
+                <p><a href="<?php echo esc_url(admin_url('admin.php?page=chatmaxima-settings')); ?>" class="button button-primary"><?php esc_html_e('Go to Settings', 'chatmaxima-ai-chatbot'); ?></a></p>
             </div>
             <?php elseif (empty($knowledge_source_alias)): ?>
             <div class="chatmaxima-card">
-                <h2><?php _e('No Knowledge Source Selected', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Please select a knowledge source first.', 'chatmaxima-ai-chatbot'); ?></p>
-                <p><a href="<?php echo admin_url('admin.php?page=chatmaxima-knowledge-sources'); ?>" class="button button-primary"><?php _e('Select Knowledge Source', 'chatmaxima-ai-chatbot'); ?></a></p>
+                <h2><?php esc_html_e('No Knowledge Source Selected', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Please select a knowledge source first.', 'chatmaxima-ai-chatbot'); ?></p>
+                <p><a href="<?php echo esc_url(admin_url('admin.php?page=chatmaxima-knowledge-sources')); ?>" class="button button-primary"><?php esc_html_e('Select Knowledge Source', 'chatmaxima-ai-chatbot'); ?></a></p>
             </div>
             <?php else: ?>
             <div class="chatmaxima-card">
-                <h2><?php _e('Sync Settings', 'chatmaxima-ai-chatbot'); ?></h2>
+                <h2><?php esc_html_e('Sync Settings', 'chatmaxima-ai-chatbot'); ?></h2>
 
                 <table class="form-table">
                     <tr>
-                        <th><label><?php _e('Knowledge Source', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label><?php esc_html_e('Knowledge Source', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <select id="chatmaxima_knowledge_source" class="regular-text">
-                                <option value=""><?php _e('-- Select Knowledge Source --', 'chatmaxima-ai-chatbot'); ?></option>
+                                <option value=""><?php esc_html_e('-- Select Knowledge Source --', 'chatmaxima-ai-chatbot'); ?></option>
                             </select>
-                            <button type="button" id="chatmaxima-refresh-ks-btn" class="button"><?php _e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
+                            <button type="button" id="chatmaxima-refresh-ks-btn" class="button"><?php esc_html_e('Refresh', 'chatmaxima-ai-chatbot'); ?></button>
                         </td>
                     </tr>
                     <tr>
-                        <th><label><?php _e('Post Types to Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label><?php esc_html_e('Post Types to Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <?php
                             $post_types = get_post_types(['public' => true], 'objects');
                             foreach ($post_types as $post_type)
                             {
                                 if ($post_type->name === 'attachment') continue;
-                                $checked = in_array($post_type->name, (array)$sync_post_types) ? 'checked' : '';
                                 echo '<label style="display: block; margin-bottom: 5px;">';
-                                echo '<input type="checkbox" name="chatmaxima_sync_post_types[]" value="' . esc_attr($post_type->name) . '" ' . $checked . ' class="chatmaxima-sync-post-type" /> ';
+                                echo '<input type="checkbox" name="chatmaxima_sync_post_types[]" value="' . esc_attr($post_type->name) . '" ' . checked(in_array($post_type->name, (array) $sync_post_types, true), true, false) . ' class="chatmaxima-sync-post-type" /> ';
                                 echo esc_html($post_type->labels->name);
                                 echo '</label>';
                             }
@@ -681,11 +724,11 @@ class ChatMaxima_Admin_Settings
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="chatmaxima_auto_sync"><?php _e('Auto Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
+                        <th><label for="chatmaxima_auto_sync"><?php esc_html_e('Auto Sync', 'chatmaxima-ai-chatbot'); ?></label></th>
                         <td>
                             <label>
                                 <input type="checkbox" id="chatmaxima_auto_sync" name="chatmaxima_auto_sync" value="1" <?php checked($auto_sync, true); ?> />
-                                <?php _e('Automatically sync new posts when published', 'chatmaxima-ai-chatbot'); ?>
+                                <?php esc_html_e('Automatically sync new posts when published', 'chatmaxima-ai-chatbot'); ?>
                             </label>
                         </td>
                     </tr>
@@ -693,8 +736,8 @@ class ChatMaxima_Admin_Settings
             </div>
 
             <div class="chatmaxima-card">
-                <h2><?php _e('Bulk Sync', 'chatmaxima-ai-chatbot'); ?></h2>
-                <p><?php _e('Sync all published content to the selected knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
+                <h2><?php esc_html_e('Bulk Sync', 'chatmaxima-ai-chatbot'); ?></h2>
+                <p><?php esc_html_e('Sync all published content to the selected knowledge source.', 'chatmaxima-ai-chatbot'); ?></p>
 
                 <?php
                 // Count posts
@@ -709,17 +752,18 @@ class ChatMaxima_Admin_Settings
                 }
                 ?>
 
-                <p><strong><?php printf(__('Total posts to sync: %d', 'chatmaxima-ai-chatbot'), $total_posts); ?></strong></p>
+                <?php /* translators: %d: number of posts that will be synced */ ?>
+                <p><strong><?php printf(esc_html__('Total posts to sync: %d', 'chatmaxima-ai-chatbot'), absint($total_posts)); ?></strong></p>
 
                 <div id="chatmaxima-sync-progress" class="chatmaxima-progress" style="display: none;">
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: 0%;"></div>
                     </div>
-                    <p class="progress-text"><?php _e('Syncing...', 'chatmaxima-ai-chatbot'); ?> <span class="progress-count">0/0</span></p>
+                    <p class="progress-text"><?php esc_html_e('Syncing...', 'chatmaxima-ai-chatbot'); ?> <span class="progress-count">0/0</span></p>
                 </div>
 
                 <p>
-                    <button type="button" id="chatmaxima-sync-all-btn" class="button button-primary button-hero"><?php _e('Sync All Content', 'chatmaxima-ai-chatbot'); ?></button>
+                    <button type="button" id="chatmaxima-sync-all-btn" class="button button-primary button-hero"><?php esc_html_e('Sync All Content', 'chatmaxima-ai-chatbot'); ?></button>
                     <span id="chatmaxima-sync-message" class="chatmaxima-message"></span>
                 </p>
             </div>
@@ -762,8 +806,8 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
         }
 
-        $email = sanitize_email($_POST['email']);
-        $password = $_POST['password'];
+        $email = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
+        $password = isset($_POST['password']) ? wp_unslash($_POST['password']) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a password is sent to the API as typed, sanitizing would alter it
 
         if (empty($email) || empty($password))
         {
@@ -839,8 +883,8 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
         }
 
-        $name = sanitize_text_field($_POST['name']);
-        $llm_type = sanitize_text_field($_POST['llm_type']);
+        $name = isset($_POST['name']) ? sanitize_text_field(wp_unslash($_POST['name'])) : '';
+        $llm_type = isset($_POST['llm_type']) ? sanitize_text_field(wp_unslash($_POST['llm_type'])) : '';
 
         if (empty($name))
         {
@@ -882,7 +926,7 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Please select a knowledge source first', 'chatmaxima-ai-chatbot')]);
         }
 
-        $post_types = isset($_POST['post_types']) ? array_map('sanitize_text_field', $_POST['post_types']) : ['post', 'page'];
+        $post_types = isset($_POST['post_types']) ? array_map('sanitize_text_field', wp_unslash((array) $_POST['post_types'])) : ['post', 'page'];
         $offset = isset($_POST['offset']) ? intval($_POST['offset']) : 0;
         $batch_size = 10;
 
@@ -953,7 +997,7 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
         }
 
-        $alias = sanitize_text_field($_POST['alias']);
+        $alias = isset($_POST['alias']) ? sanitize_text_field(wp_unslash($_POST['alias'])) : '';
         update_option('chatmaxima_knowledge_source_alias', $alias);
 
         wp_send_json_success(['message' => __('Knowledge source saved', 'chatmaxima-ai-chatbot')]);
@@ -965,7 +1009,7 @@ class ChatMaxima_Admin_Settings
     public function ajax_get_teams()
     {
         // Verify nonce - use wp_verify_nonce instead of check_ajax_referer to handle error gracefully
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'chatmaxima_admin_nonce'))
+        if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'chatmaxima_admin_nonce'))
         {
             wp_send_json_error(['message' => __('Security check failed. Please refresh the page and try again.', 'chatmaxima-ai-chatbot')]);
             return;
@@ -1013,7 +1057,7 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
         }
 
-        $team_alias = sanitize_text_field($_POST['team_alias']);
+        $team_alias = isset($_POST['team_alias']) ? sanitize_text_field(wp_unslash($_POST['team_alias'])) : '';
 
         if (empty($team_alias))
         {
@@ -1042,7 +1086,7 @@ class ChatMaxima_Admin_Settings
     public function ajax_get_channels()
     {
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'chatmaxima_admin_nonce'))
+        if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'chatmaxima_admin_nonce'))
         {
             wp_send_json_error(['message' => __('Security check failed. Please refresh the page and try again.', 'chatmaxima-ai-chatbot')]);
             return;
@@ -1062,7 +1106,7 @@ class ChatMaxima_Admin_Settings
         }
 
         // Get platform filter from request (default to 'livechatwidget' for chatbot widget)
-        $platform = isset($_POST['platform']) ? sanitize_text_field($_POST['platform']) : 'livechatwidget';
+        $platform = isset($_POST['platform']) ? sanitize_text_field(wp_unslash($_POST['platform'])) : 'livechatwidget';
 
         $result = $this->api_client->list_channels($platform, 'Y');
 
@@ -1094,7 +1138,7 @@ class ChatMaxima_Admin_Settings
             return;
         }
 
-        $alias = isset($_POST['alias']) ? sanitize_text_field($_POST['alias']) : '';
+        $alias = isset($_POST['alias']) ? sanitize_text_field(wp_unslash($_POST['alias'])) : '';
         update_option('chatmaxima_channel_alias', $alias);
 
         wp_send_json_success(['message' => __('Channel saved', 'chatmaxima-ai-chatbot')]);
@@ -1113,7 +1157,7 @@ class ChatMaxima_Admin_Settings
             return;
         }
 
-        $alias = sanitize_text_field($_POST['alias']);
+        $alias = isset($_POST['alias']) ? sanitize_text_field(wp_unslash($_POST['alias'])) : '';
 
         if (empty($alias))
         {

@@ -1,0 +1,10 @@
+/* ChatMaxima sync meta box and posts-list column */
+.chatmaxima-sync-meta-box .status-synced,
+.chatmaxima-column-synced { color: #46b450; }
+.chatmaxima-sync-meta-box .status-error,
+.chatmaxima-sync-meta-box .error-message,
+.chatmaxima-sync-now-message.is-error,
+.chatmaxima-column-error { color: #dc3232; }
+.chatmaxima-sync-meta-box .status-pending,
+.chatmaxima-column-muted { color: #999; }
+.chatmaxima-sync-now-message { display: block; margin-top: 6px; }

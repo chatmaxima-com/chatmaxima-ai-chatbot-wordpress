@@ -44,6 +44,39 @@ class ChatMaxima_Content_Sync
         add_filter('manage_pages_columns', [$this, 'add_sync_column']);
         add_action('manage_posts_custom_column', [$this, 'sync_column_content'], 10, 2);
         add_action('manage_pages_custom_column', [$this, 'sync_column_content'], 10, 2);
+
+        // Meta box and posts-list column assets
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_editor_assets']);
+    }
+
+    /**
+     * Enqueue the sync meta box script and the status styles on the post editor and posts list
+     */
+    public function enqueue_editor_assets($hook)
+    {
+        if (!in_array($hook, ['post.php', 'post-new.php', 'edit.php'], true))
+        {
+            return;
+        }
+
+        wp_enqueue_style('chatmaxima-meta-box', CHATMAXIMA_PLUGIN_URL . 'assets/meta-box.css', [], CHATMAXIMA_VERSION);
+
+        if ($hook === 'edit.php')
+        {
+            return; // the posts list only needs the status colours
+        }
+
+        wp_enqueue_script('chatmaxima-meta-box', CHATMAXIMA_PLUGIN_URL . 'assets/meta-box.js', ['jquery'], CHATMAXIMA_VERSION, true);
+        wp_localize_script('chatmaxima-meta-box', 'chatmaximaMetaBox', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('chatmaxima_sync_single'),
+            'strings' => [
+                'syncing' => __('Syncing...', 'chatmaxima-ai-chatbot'),
+                'synced' => __('Synced!', 'chatmaxima-ai-chatbot'),
+                'syncNow' => __('Sync Now', 'chatmaxima-ai-chatbot'),
+                'failed' => __('Sync failed. Please try again.', 'chatmaxima-ai-chatbot'),
+            ],
+        ]);
     }
 
     /**
@@ -123,8 +156,7 @@ class ChatMaxima_Content_Sync
 
         if (is_wp_error($result))
         {
-            // Log error
-            error_log('ChatMaxima sync error for post ' . $post_id . ': ' . $result->get_error_message());
+            // Record the error on the post (shown in the meta box)
             update_post_meta($post_id, '_chatmaxima_sync_status', 'error');
             update_post_meta($post_id, '_chatmaxima_sync_error', $result->get_error_message());
             return false;
@@ -174,76 +206,37 @@ class ChatMaxima_Content_Sync
             <p>
                 <label>
                     <input type="checkbox" name="chatmaxima_exclude_sync" value="1" <?php checked($exclude_from_sync, '1'); ?> />
-                    <?php _e('Exclude from sync', 'chatmaxima-ai-chatbot'); ?>
+                    <?php esc_html_e('Exclude from sync', 'chatmaxima-ai-chatbot'); ?>
                 </label>
             </p>
 
             <div class="chatmaxima-sync-status">
-                <strong><?php _e('Status:', 'chatmaxima-ai-chatbot'); ?></strong>
+                <strong><?php esc_html_e('Status:', 'chatmaxima-ai-chatbot'); ?></strong>
                 <?php if ($sync_status === 'synced'): ?>
-                    <span class="status-synced"><?php _e('Synced', 'chatmaxima-ai-chatbot'); ?></span>
+                    <span class="status-synced"><?php esc_html_e('Synced', 'chatmaxima-ai-chatbot'); ?></span>
                     <?php if ($sync_date): ?>
                         <br><small><?php echo esc_html($sync_date); ?></small>
                     <?php endif; ?>
                 <?php elseif ($sync_status === 'error'): ?>
-                    <span class="status-error"><?php _e('Error', 'chatmaxima-ai-chatbot'); ?></span>
+                    <span class="status-error"><?php esc_html_e('Error', 'chatmaxima-ai-chatbot'); ?></span>
                     <?php if ($sync_error): ?>
                         <br><small class="error-message"><?php echo esc_html($sync_error); ?></small>
                     <?php endif; ?>
                 <?php else: ?>
-                    <span class="status-pending"><?php _e('Not synced', 'chatmaxima-ai-chatbot'); ?></span>
+                    <span class="status-pending"><?php esc_html_e('Not synced', 'chatmaxima-ai-chatbot'); ?></span>
                 <?php endif; ?>
             </div>
 
             <?php if ($post->post_status === 'publish' && !$exclude_from_sync): ?>
             <p>
                 <button type="button" class="button chatmaxima-sync-now-btn" data-post-id="<?php echo esc_attr($post->ID); ?>">
-                    <?php _e('Sync Now', 'chatmaxima-ai-chatbot'); ?>
+                    <?php esc_html_e('Sync Now', 'chatmaxima-ai-chatbot'); ?>
                 </button>
+                <span class="chatmaxima-sync-now-message"></span>
             </p>
             <?php endif; ?>
         </div>
 
-        <style>
-            .chatmaxima-sync-meta-box .status-synced { color: #46b450; }
-            .chatmaxima-sync-meta-box .status-error { color: #dc3232; }
-            .chatmaxima-sync-meta-box .status-pending { color: #999; }
-            .chatmaxima-sync-meta-box .error-message { color: #dc3232; }
-        </style>
-
-        <script>
-            jQuery(document).ready(function($) {
-                $('.chatmaxima-sync-now-btn').on('click', function() {
-                    var $btn = $(this);
-                    var postId = $btn.data('post-id');
-
-                    $btn.prop('disabled', true).text('<?php _e('Syncing...', 'chatmaxima-ai-chatbot'); ?>');
-
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'chatmaxima_sync_single_post',
-                            post_id: postId,
-                            nonce: '<?php echo wp_create_nonce('chatmaxima_sync_single'); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                $btn.text('<?php _e('Synced!', 'chatmaxima-ai-chatbot'); ?>');
-                                location.reload();
-                            } else {
-                                $btn.prop('disabled', false).text('<?php _e('Sync Now', 'chatmaxima-ai-chatbot'); ?>');
-                                alert(response.data.message);
-                            }
-                        },
-                        error: function() {
-                            $btn.prop('disabled', false).text('<?php _e('Sync Now', 'chatmaxima-ai-chatbot'); ?>');
-                            alert('<?php _e('Sync failed. Please try again.', 'chatmaxima-ai-chatbot'); ?>');
-                        }
-                    });
-                });
-            });
-        </script>
         <?php
     }
 
@@ -252,7 +245,7 @@ class ChatMaxima_Content_Sync
      */
     public function save_sync_meta($post_id, $post)
     {
-        if (!isset($_POST['chatmaxima_sync_nonce']) || !wp_verify_nonce($_POST['chatmaxima_sync_nonce'], 'chatmaxima_sync_meta'))
+        if (!isset($_POST['chatmaxima_sync_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['chatmaxima_sync_nonce'])), 'chatmaxima_sync_meta'))
         {
             return;
         }
@@ -325,16 +318,19 @@ class ChatMaxima_Content_Sync
      */
     public function bulk_action_admin_notice()
     {
+        // Counts added to the redirect URL by handle_bulk_action(); display-only, so no nonce is needed
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended
         if (!empty($_REQUEST['chatmaxima_synced']) || !empty($_REQUEST['chatmaxima_failed']))
         {
-            $synced = intval($_REQUEST['chatmaxima_synced']);
-            $failed = intval($_REQUEST['chatmaxima_failed']);
+            $synced = isset($_REQUEST['chatmaxima_synced']) ? absint($_REQUEST['chatmaxima_synced']) : 0;
+            $failed = isset($_REQUEST['chatmaxima_failed']) ? absint($_REQUEST['chatmaxima_failed']) : 0;
 
             if ($synced > 0)
             {
                 printf(
                     '<div class="notice notice-success is-dismissible"><p>%s</p></div>',
-                    sprintf(
+                    esc_html(sprintf(
+                        /* translators: %d: number of posts synced */
                         _n(
                             '%d post synced to ChatMaxima.',
                             '%d posts synced to ChatMaxima.',
@@ -342,7 +338,7 @@ class ChatMaxima_Content_Sync
                             'chatmaxima-ai-chatbot'
                         ),
                         $synced
-                    )
+                    ))
                 );
             }
 
@@ -350,7 +346,8 @@ class ChatMaxima_Content_Sync
             {
                 printf(
                     '<div class="notice notice-error is-dismissible"><p>%s</p></div>',
-                    sprintf(
+                    esc_html(sprintf(
+                        /* translators: %d: number of posts that failed to sync */
                         _n(
                             '%d post failed to sync.',
                             '%d posts failed to sync.',
@@ -358,10 +355,11 @@ class ChatMaxima_Content_Sync
                             'chatmaxima-ai-chatbot'
                         ),
                         $failed
-                    )
+                    ))
                 );
             }
         }
+        // phpcs:enable WordPress.Security.NonceVerification.Recommended
     }
 
     /**
@@ -388,19 +386,19 @@ class ChatMaxima_Content_Sync
 
         if ($exclude === '1')
         {
-            echo '<span style="color: #999;">' . __('Excluded', 'chatmaxima-ai-chatbot') . '</span>';
+            echo '<span class="chatmaxima-column-muted">' . esc_html__('Excluded', 'chatmaxima-ai-chatbot') . '</span>';
         }
         elseif ($sync_status === 'synced')
         {
-            echo '<span style="color: #46b450;">' . __('Synced', 'chatmaxima-ai-chatbot') . '</span>';
+            echo '<span class="chatmaxima-column-synced">' . esc_html__('Synced', 'chatmaxima-ai-chatbot') . '</span>';
         }
         elseif ($sync_status === 'error')
         {
-            echo '<span style="color: #dc3232;">' . __('Error', 'chatmaxima-ai-chatbot') . '</span>';
+            echo '<span class="chatmaxima-column-error">' . esc_html__('Error', 'chatmaxima-ai-chatbot') . '</span>';
         }
         else
         {
-            echo '<span style="color: #999;">-</span>';
+            echo '<span class="chatmaxima-column-muted">-</span>';
         }
     }
 }
@@ -414,7 +412,7 @@ add_action('wp_ajax_chatmaxima_sync_single_post', function() {
         wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
     }
 
-    $post_id = intval($_POST['post_id']);
+    $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0; // nonce checked by check_ajax_referer() above
 
     if (!$post_id)
     {

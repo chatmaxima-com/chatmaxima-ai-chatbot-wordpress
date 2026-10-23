@@ -142,7 +142,7 @@ This plugin connects to ChatMaxima services to provide chatbot and knowledge sou
 
 ## Support
 
-- Documentation: [ChatMaxima Docs](https://chatmaxima.com/docs)
+- Documentation: [ChatMaxima Docs](https://docs.chatmaxima.com/)
 - Support Email: support@chatmaxima.com
 - Issues: [GitHub Issues](https://github.com/chatmaxima/chatmaxima-wordpress-plugin/issues)
 
