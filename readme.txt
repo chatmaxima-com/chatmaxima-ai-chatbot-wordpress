@@ -1,5 +1,5 @@
 === ChatMaxima AI Chatbot ===
-Contributors: chatmaxima
+Contributors: avignesh
 Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
