@@ -140,7 +140,7 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 1. Plugin settings page with API connection
 2. Knowledge source management
-3. Content sync with progress tracking
+3. Content sync settings and bulk sync
 4. Post meta box showing sync status
 5. Bulk action for syncing multiple posts
 6. Chatbot widget settings
