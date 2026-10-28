@@ -68,11 +68,14 @@ chatmaxima-ai-chatbot/
 ├── uninstall.php                 # Cleanup on uninstall
 ├── includes/
 │   ├── class-api-client.php      # ChatMaxima API v2 client
-│   ├── class-admin-settings.php  # Admin settings page
+│   ├── class-setup-wizard.php    # Setup wizard and Home page
+│   ├── class-admin-settings.php  # Admin menu and AJAX handlers
 │   └── class-content-sync.php    # Content sync functionality
 ├── assets/
-│   ├── admin.js                  # Admin JavaScript
-│   ├── admin.css                 # Admin styles
+│   ├── setup.js                  # Setup wizard and Home JavaScript
+│   ├── setup.css                 # Setup wizard and Home styles
+│   ├── meta-box.js               # Post editor sync box
+│   ├── meta-box.css
 │   └── README.md                 # Asset guidelines
 └── README.md                     # This file
 ```

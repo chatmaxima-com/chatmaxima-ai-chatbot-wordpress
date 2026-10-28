@@ -45,9 +45,9 @@ class ChatMaxima_API_Client
         $this->refresh_token = $refresh_token;
         $this->token_expiry = time() + $expires_in - 60; // Subtract 60 seconds buffer
 
-        update_option('chatmaxima_access_token', $access_token);
-        update_option('chatmaxima_refresh_token', $refresh_token);
-        update_option('chatmaxima_token_expiry', $this->token_expiry);
+        update_option('chatmaxima_access_token', $access_token, false); // never autoloaded: not in alloptions on every request
+        update_option('chatmaxima_refresh_token', $refresh_token, false);
+        update_option('chatmaxima_token_expiry', $this->token_expiry, false);
     }
 
     /**
@@ -109,7 +109,7 @@ class ChatMaxima_API_Client
             return $response;
         }
 
-        if (isset($response['status']) && $response['status'] === 'success')
+        if (is_array($response) && isset($response['status']) && $response['status'] === 'success' && isset($response['data']['access_token'], $response['data']['refresh_token'], $response['data']['expires_in']))
         {
             $data = $response['data'];
             $this->save_tokens(
@@ -121,14 +121,137 @@ class ChatMaxima_API_Client
             // Store user info
             if (isset($data['user']))
             {
-                update_option('chatmaxima_user_info', $data['user']);
+                update_option('chatmaxima_user_info', $data['user'], false);
             }
 
             return true;
         }
 
-        $error_message = isset($response['error']['message']) ? $response['error']['message'] : 'Login failed';
-        return new WP_Error('login_failed', $error_message);
+        $error_message = 'Login failed';
+        $error_code = 'login_failed';
+        if (isset($response['error']['message']))
+        {
+            $error_message = $response['error']['message'];
+        }
+        if (isset($response['error']['code']))
+        {
+            $error_code = $response['error']['code']; // ACCOUNT_INACTIVE: a plugin sign-up still waiting for its email code
+        }
+        return new WP_Error($error_code, $error_message);
+    }
+
+    /**
+     * Activate a plugin sign-up with the code ChatMaxima emailed, and connect it
+     */
+    public function verify_signup($email, $code)
+    {
+        $response = $this->make_request('auth/verify-signup/', 'POST', ['email' => $email, 'code' => $code], false);
+
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        if (is_array($response) && isset($response['status']) && $response['status'] === 'success' && isset($response['data']['access_token'], $response['data']['refresh_token'], $response['data']['expires_in']))
+        {
+            $data = $response['data'];
+            $this->save_tokens($data['access_token'], $data['refresh_token'], $data['expires_in']);
+            if (isset($data['user']))
+            {
+                update_option('chatmaxima_user_info', $data['user'], false);
+            }
+            return true;
+        }
+
+        $error_message = 'That code did not work';
+        $error_code = 'verify_failed';
+        if (isset($response['error']['message']))
+        {
+            $error_message = $response['error']['message'];
+        }
+        if (isset($response['error']['code']))
+        {
+            $error_code = $response['error']['code'];
+        }
+        return new WP_Error($error_code, $error_message);
+    }
+
+    /**
+     * Email a new sign-up code
+     */
+    public function resend_signup_code($email)
+    {
+        $response = $this->make_request('auth/resend-signup-code/', 'POST', ['email' => $email], false);
+
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        if (isset($response['status']) && $response['status'] === 'success')
+        {
+            return true;
+        }
+
+        $error_message = 'Could not send a new code';
+        if (isset($response['error']['message']))
+        {
+            $error_message = $response['error']['message'];
+        }
+        return new WP_Error('resend_failed', $error_message);
+    }
+
+    /**
+     * Create a ChatMaxima account and connect it (the API returns tokens like a login)
+     */
+    public function register($name, $email, $password, $workspace_name = '')
+    {
+        $response = $this->make_request('auth/register/', 'POST', [
+            'name' => $name,
+            'email' => $email,
+            'password' => $password,
+            'signup_source' => 'wordpress', // Plugin sign-ups start on the Free plan
+            'workspace_name' => $workspace_name // Workspace named after the site
+        ], false); // No token yet
+
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        if (is_array($response) && isset($response['status']) && $response['status'] === 'success' && !empty($response['data']['verification_required']))
+        {
+            return ['verification_required' => true, 'email' => $email]; // the account activates with the emailed code (verify_signup)
+        }
+
+        if (is_array($response) && isset($response['status']) && $response['status'] === 'success' && isset($response['data']['access_token'], $response['data']['refresh_token'], $response['data']['expires_in']))
+        {
+            $data = $response['data'];
+            $this->save_tokens(
+                $data['access_token'],
+                $data['refresh_token'],
+                $data['expires_in']
+            );
+
+            if (isset($data['user']))
+            {
+                update_option('chatmaxima_user_info', $data['user'], false);
+            }
+
+            return true;
+        }
+
+        $error_message = 'Could not create the account';
+        $error_code = 'register_failed';
+        if (isset($response['error']['message']))
+        {
+            $error_message = $response['error']['message'];
+        }
+        if (isset($response['error']['code']))
+        {
+            $error_code = $response['error']['code']; // EMAIL_EXISTS lets the form offer "Sign in instead"
+        }
+        return new WP_Error($error_code, $error_message);
     }
 
     /**
@@ -232,7 +355,7 @@ class ChatMaxima_API_Client
      */
     public function get_knowledge_source($alias)
     {
-        $response = $this->make_request('knowledge-sources/' . $alias . '/', 'GET');
+        $response = $this->make_request('knowledge-sources/' . rawurlencode($alias) . '/', 'GET');
 
         if (is_wp_error($response))
         {
@@ -289,7 +412,7 @@ class ChatMaxima_API_Client
             $urls = [$urls];
         }
 
-        $response = $this->make_request('knowledge-sources/' . $alias . '/training/', 'POST', [
+        $response = $this->make_request('knowledge-sources/' . rawurlencode($alias) . '/training/', 'POST', [
             'urls' => $urls
         ]);
 
@@ -312,7 +435,7 @@ class ChatMaxima_API_Client
      */
     public function get_training_content($alias)
     {
-        $response = $this->make_request('knowledge-sources/' . $alias . '/training/', 'GET');
+        $response = $this->make_request('knowledge-sources/' . rawurlencode($alias) . '/training/', 'GET');
 
         if (is_wp_error($response))
         {
@@ -332,7 +455,7 @@ class ChatMaxima_API_Client
      */
     public function delete_training_content($alias, $training_id)
     {
-        $response = $this->make_request('knowledge-sources/' . $alias . '/training/' . $training_id . '/', 'DELETE');
+        $response = $this->make_request('knowledge-sources/' . rawurlencode($alias) . '/training/' . rawurlencode((string) $training_id) . '/', 'DELETE');
 
         if (is_wp_error($response))
         {
@@ -351,13 +474,13 @@ class ChatMaxima_API_Client
     /**
      * Make HTTP request to ChatMaxima API
      */
-    private function make_request($endpoint, $method = 'GET', $body = null, $require_auth = true)
+    private function make_request($endpoint, $method = 'GET', $body = null, $require_auth = true, $timeout = 30)
     {
         $url = $this->api_base_url . $endpoint;
 
         $args = [
             'method' => $method,
-            'timeout' => 30,
+            'timeout' => $timeout,
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json'
@@ -508,7 +631,7 @@ class ChatMaxima_API_Client
                     $user_info['team_alias'] = $data['team']['team_alias'];
                     $user_info['team_name'] = $data['team']['team_name'];
                 }
-                update_option('chatmaxima_user_info', $user_info);
+                update_option('chatmaxima_user_info', $user_info, false);
             }
 
             // Store selected team alias
@@ -568,11 +691,129 @@ class ChatMaxima_API_Client
     }
 
     /**
+     * Call an API v2 endpoint and return its data, or a WP_Error carrying the API's error code
+     * (for example CHANNEL_LIMIT_REACHED) so the setup wizard can react to it
+     */
+    private function api_call($endpoint, $method = 'GET', $body = null, $timeout = 30)
+    {
+        $response = $this->make_request($endpoint, $method, $body, true, $timeout);
+
+        if (is_wp_error($response))
+        {
+            return $response;
+        }
+
+        if (is_array($response) && isset($response['status']) && $response['status'] === 'success')
+        {
+            if (isset($response['data']) && is_array($response['data']))
+            {
+                return $response['data'];
+            }
+            return [];
+        }
+
+        $code = 'api_error';
+        $message = __('ChatMaxima did not accept the request. Please try again.', 'chatmaxima-ai-chatbot');
+        if (isset($response['error']['code']))
+        {
+            $code = $response['error']['code'];
+        }
+        if (isset($response['error']['message']))
+        {
+            $message = $response['error']['message'];
+        }
+        return new WP_Error($code, $message);
+    }
+
+    /**
+     * Workspaces with the user's role and chatbot and channel counts
+     */
+    public function list_teams_with_details()
+    {
+        return $this->api_call('teams/', 'POST', ['details' => true]);
+    }
+
+    /**
+     * Create a persona chatbot on a knowledge source (the system prompt is written by an AI call, so allow time)
+     */
+    public function create_chatbot($data)
+    {
+        return $this->api_call('chatbots/', 'POST', $data, 90);
+    }
+
+    public function get_chatbot($bot_alias)
+    {
+        return $this->api_call('chatbots/' . rawurlencode($bot_alias) . '/', 'GET');
+    }
+
+    public function update_chatbot($bot_alias, $data)
+    {
+        return $this->api_call('chatbots/' . rawurlencode($bot_alias) . '/', 'POST', $data, 90);
+    }
+
+    /**
+     * A sample reply from the saved chatbot (a real AI reply, so allow time)
+     */
+    public function preview_chatbot($bot_alias, $question)
+    {
+        return $this->api_call('chatbots/' . rawurlencode($bot_alias) . '/preview/', 'POST', ['question' => $question], 75);
+    }
+
+    /**
+     * Upload an avatar image (raw bytes), returns ['avatar_url' => ...]
+     */
+    public function upload_avatar($binary)
+    {
+        return $this->api_call('chatbots/avatar/', 'POST', ['image' => base64_encode($binary)], 45); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- the API takes the image as base64 JSON
+    }
+
+    public function list_ai_keys()
+    {
+        return $this->api_call('ai-keys/', 'GET');
+    }
+
+    /**
+     * Add a provider key to the workspace. The key goes to ChatMaxima only; it is never stored in WordPress.
+     */
+    public function add_ai_key($provider, $api_key, $name = '')
+    {
+        return $this->api_call('ai-keys/', 'POST', ['provider' => $provider, 'api_key' => $api_key, 'name' => $name]);
+    }
+
+    public function test_ai_key($provider, $api_key, $credential_id = '')
+    {
+        $body = ['provider' => $provider, 'api_key' => $api_key];
+        if ($credential_id !== '')
+        {
+            $body = ['credential_id' => $credential_id];
+        }
+        return $this->api_call('ai-keys/test/', 'POST', $body);
+    }
+
+    public function delete_ai_key($credential_id)
+    {
+        return $this->api_call('ai-keys/' . rawurlencode($credential_id) . '/', 'DELETE', ['_' => 1]);
+    }
+
+    public function list_ai_models($provider)
+    {
+        return $this->api_call('ai-models/?provider=' . rawurlencode($provider), 'GET');
+    }
+
+    /**
+     * Put the chatbot on this site: reuse or create the web channel, attach the bot, set its name and avatar
+     */
+    public function attach_web_channel($data)
+    {
+        return $this->api_call('channels/web/', 'POST', $data);
+    }
+
+    /**
      * Get single channel by alias
      */
     public function get_channel($alias)
     {
-        $response = $this->make_request('channels/' . $alias . '/', 'GET');
+        $response = $this->make_request('channels/' . rawurlencode($alias) . '/', 'GET');
 
         if (is_wp_error($response))
         {

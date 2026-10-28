@@ -4,60 +4,40 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.4
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-powered chatbot integration for WordPress with knowledge source management and content sync.
+An AI chatbot that answers visitors from your own posts and pages, with a guided setup that takes about five minutes.
 
 == Description ==
 
-ChatMaxima AI Chatbot is a powerful WordPress plugin that integrates an intelligent chatbot into your website and allows you to sync your WordPress content to ChatMaxima knowledge sources for AI training.
+ChatMaxima AI Chatbot puts a chatbot on your WordPress site that answers questions from your own content. A guided setup takes about five minutes and never leaves WordPress:
 
-= Key Features =
+1. **Connect** - Sign in to ChatMaxima, or create a free account right in the plugin.
+2. **Knowledge** - Choose which posts, pages and other content types to sync. The plugin copies them into a ChatMaxima knowledge source in small batches, with progress shown as it goes.
+3. **Chatbot** - Give the bot a name, an avatar, a role (support, sales, booking, or your own words), a tone, a welcome message and any extra rules. Try sample questions and see how it answers before anyone else does. MaxIA V4 is included at no cost; you can also use your own OpenAI, Anthropic, Google Gemini or Groq key.
+4. **Install** - Preview the real chat widget in the admin, then switch it on for visitors when you are ready.
 
-* **AI-Powered Conversations** - Advanced chatbot technology for natural interactions
-* **Knowledge Source Management** - Create and manage knowledge sources via API
-* **Content Sync** - Sync WordPress posts and pages to ChatMaxima
-* **Bulk Sync** - Sync all published content with progress tracking
-* **Auto-Sync** - Automatically sync new posts when published
-* **Customizable Theme Colors** - Match your brand with custom color schemes
-* **Social Media Integration** - Connect Facebook, Instagram, WhatsApp, Telegram, and more
-* **Easy Configuration** - Simple admin interface for quick setup
-* **Responsive Design** - Works perfectly on desktop and mobile devices
+After setup, the plugin's Home page shows the connection, knowledge source, chatbot and widget at a glance, each editable in place.
 
-= How It Works =
+= Features =
 
-1. Install and activate the plugin
-2. Go to Settings > ChatMaxima Chatbot
-3. Connect with your ChatMaxima account credentials
-4. Select or create a knowledge source
-5. Choose which post types to sync
-6. Click "Sync All Content" to train your AI
-7. Enter your Token ID for the chatbot widget
-8. Configure theme color and social media
-
-= Knowledge Source Features =
-
-* Create new knowledge sources directly from WordPress
-* Choose your preferred LLM (OpenAI, Claude, or Gemini)
-* Sync individual posts or bulk sync all content
-* Auto-sync new posts when published
-* Track sync status on each post
-
-= Social Media Platforms Supported =
-
-* Facebook
-* Instagram
-* Telegram
-* WhatsApp
-* Email
-* Phone
-* SMS
+* **Guided setup** - Four steps with progress saved, so you can leave and come back
+* **Free account from the plugin** - 1,000 messages a month and the MaxIA V4 AI model, no API key needed
+* **Content sync** - Published, public posts and pages only; drafts, private and password-protected content are never sent
+* **Auto Sync** - New and updated posts are added to the knowledge source when published, and removed when trashed
+* **Per-post control** - A sync box in the editor shows status and lets you exclude a post
+* **Bulk sync** - Sync selected posts from the Posts list
+* **Chatbot persona** - Name, avatar, role, tone, welcome message and extra instructions
+* **Live preview** - Ask the chatbot sample questions while you set it up
+* **Your own AI key** - OpenAI, Anthropic, Google Gemini or Groq, checked before it is saved and kept in your ChatMaxima workspace, never in WordPress
+* **One switch to go live** - The widget shows to visitors only when you turn it on
+* **Multisite ready** - Each site connects on its own
 
 = Requirements =
 
-* A ChatMaxima account
+* A ChatMaxima account (one can be created during setup)
 * WordPress 5.0 or higher
 * PHP 7.4 or higher
 
@@ -77,21 +57,23 @@ ChatMaxima AI Chatbot is a powerful WordPress plugin that integrates an intellig
 3. Choose the zip file and click "Install Now"
 4. Activate the plugin
 
-= Configuration =
+= Setup =
 
-1. Go to Settings > ChatMaxima Chatbot
-2. Connect with your ChatMaxima email and password
-3. Select or create a knowledge source
-4. Choose post types to sync and click "Sync All Content"
-5. Enter your Token ID for the chatbot widget
-6. Select theme color and add social media handles
-7. Save settings
+1. Open ChatMaxima in the admin menu
+2. Sign in to ChatMaxima, or create a free account
+3. Choose the content to sync and let the sync run
+4. Name your chatbot, pick its role and tone, and try it
+5. Switch "Show on your site" on when you want visitors to see it
 
 == Frequently Asked Questions ==
 
 = Do I need a ChatMaxima account? =
 
-Yes, you need a ChatMaxima account to use the API features and knowledge source management. The chatbot widget requires a Token ID from your ChatMaxima dashboard.
+Yes. You can create a free one during setup without leaving WordPress. The free plan includes 1,000 messages a month and the MaxIA V4 AI model.
+
+= Do I need an AI API key? =
+
+No. MaxIA V4 is included with your ChatMaxima account. You only need a key if you prefer a model from OpenAI, Anthropic, Google or Groq, and that company then bills you for each reply. A key you add is checked with the provider first and stored in your ChatMaxima workspace, never in WordPress.
 
 = What is a knowledge source? =
 
@@ -99,15 +81,15 @@ A knowledge source is where your content is stored and indexed for AI training. 
 
 = How does content sync work? =
 
-The plugin sends your published post URLs to ChatMaxima's API. The content is then crawled and indexed into your selected knowledge source for AI training.
+The plugin sends the addresses of your published, public posts and pages to ChatMaxima's API. ChatMaxima then reads those pages into your knowledge source. Drafts, private posts and password-protected posts are never sent.
 
 = Can I customize the chatbot appearance? =
 
-Yes, you can customize the theme color through the plugin settings to match your brand.
+The name, avatar and welcome message are set in the plugin. Colours, position and the rest of the widget's look are changed in the ChatMaxima dashboard.
 
-= Which social media platforms are supported? =
+= Where do the chats go? =
 
-The plugin supports Facebook, Instagram, Telegram, WhatsApp, Email, Phone, and SMS integration.
+To the ChatMaxima inbox, under the web channel the plugin sets up for your site. A person on your team can take over any chat from there.
 
 = Will this slow down my website? =
 
@@ -129,7 +111,9 @@ The plugin communicates with ChatMaxima in the following ways:
 
 * **Chatbot widget:** On pages where the widget is enabled, the plugin loads the ChatMaxima widget script from https://widget.chatmaxima.com/embed.min.js so the chatbot can render for your visitors.
 * **Account authentication:** When you connect the plugin, your ChatMaxima login credentials are sent to the ChatMaxima API to obtain an access token. Only the resulting token is stored in your WordPress database.
-* **Content sync:** When you sync content, the URLs of the WordPress posts and pages you choose (and their content, for crawling) are sent to the ChatMaxima API so they can be indexed into your selected knowledge source for AI training.
+* **Content sync:** When you sync content, the URLs of the published, public WordPress posts and pages you choose are sent to the ChatMaxima API, which reads those pages so they can be indexed into your selected knowledge source for AI training.
+* **Chatbot setup:** The chatbot name, avatar image, role, tone, welcome message and instructions you enter, and any AI provider API key you choose to add, are sent to the ChatMaxima API and stored in your ChatMaxima workspace. Keys are never stored in WordPress.
+* **Account creation:** If you create an account from the plugin, the name, email address and password you enter and your site's title are sent to the ChatMaxima API. ChatMaxima emails a code to confirm the address.
 
 Data is sent to ChatMaxima only when you connect the plugin, sync content, or serve the widget. The plugin itself does not collect personal data from your site visitors.
 
@@ -138,14 +122,27 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Screenshots ==
 
-1. Plugin settings page with API connection
-2. Knowledge source management
-3. Content sync settings and bulk sync
+1. Setup, step 1: sign in to ChatMaxima or create a free account
+2. Setup, step 2: choose the content to sync and watch it run
+3. Setup, step 3: name the chatbot, pick its role and tone, and try sample questions
 4. Post meta box showing sync status
 5. Bulk action for syncing multiple posts
-6. Chatbot widget settings
+6. Home: connection, knowledge, chatbot and widget at a glance
 
 == Changelog ==
+
+= 2.1.0 =
+* New guided setup: Connect, Knowledge, Chatbot, Install, with progress saved between visits. The old Settings, Knowledge Sources and Content Sync pages are replaced by Setup (then Home) and Help
+* Create a free ChatMaxima account from the plugin, confirmed by an emailed code
+* Workspace picker when your account has more than one workspace
+* Create the chatbot in the plugin: name, avatar, role, tone, welcome message and extra instructions, with a live preview of its answers
+* Choose MaxIA V4 (included) or your own OpenAI, Anthropic, Google Gemini or Groq key; keys are checked with the provider and only the models the key can use are offered
+* The web channel is created or reused for you and the real widget is previewed in the admin before you go live
+* Home page after setup with every part editable in place
+* Content sync now skips password-protected posts and respects the content type selection and the per-post exclude flag on auto sync, as the documentation always said
+* "Sync now" and the bulk action only work on posts the user can edit
+* Hardened the admin against injected names from ChatMaxima data; tokens are no longer autoloaded options
+* Removed the unused theme colour, social media and token ID settings
 
 = 2.0.4 =
 * New settings page layout: a setup tracker across the top and a two-column view that uses the full screen width
@@ -185,6 +182,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.0 =
+New guided setup and Home page. Existing connections and the live widget are kept; open ChatMaxima in the admin menu to see the new Home.
 
 = 2.0.4 =
 Redesigned settings page. Auto Sync and post type choices now save correctly; check them after updating.

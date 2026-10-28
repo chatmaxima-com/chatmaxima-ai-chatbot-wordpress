@@ -2,8 +2,8 @@
 /**
  * Plugin Name: ChatMaxima AI Chatbot
  * Plugin URI: https://chatmaxima.com/
- * Description: AI-powered chatbot integration for WordPress with customizable themes, social media support, and knowledge source management.
- * Version: 2.0.4
+ * Description: Add an AI chatbot that answers visitors from your own posts and pages. Guided setup: connect ChatMaxima, sync your content, create the chatbot, go live.
+ * Version: 2.1.0
  * Author: ChatMaxima
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -19,10 +19,11 @@ if (!defined('ABSPATH'))
 // Define plugin constants
 define('CHATMAXIMA_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CHATMAXIMA_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('CHATMAXIMA_VERSION', '2.0.4');
+define('CHATMAXIMA_VERSION', '2.1.0');
 
 // Include required files
 require_once CHATMAXIMA_PLUGIN_PATH . 'includes/class-api-client.php';
+require_once CHATMAXIMA_PLUGIN_PATH . 'includes/class-setup-wizard.php';
 require_once CHATMAXIMA_PLUGIN_PATH . 'includes/class-admin-settings.php';
 require_once CHATMAXIMA_PLUGIN_PATH . 'includes/class-content-sync.php';
 
@@ -142,7 +143,7 @@ add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'chatmaxima_plugi
 function chatmaxima_plugin_action_links($links)
 {
     $settings_link = '<a href="' . esc_url(admin_url('admin.php?page=chatmaxima-settings')) . '">' . esc_html__('Settings', 'chatmaxima-ai-chatbot') . '</a>';
-    $knowledge_link = '<a href="' . esc_url(admin_url('admin.php?page=chatmaxima-knowledge-sources')) . '">' . esc_html__('Knowledge Sources', 'chatmaxima-ai-chatbot') . '</a>';
+    $knowledge_link = '<a href="' . esc_url(admin_url('admin.php?page=chatmaxima-help')) . '">' . esc_html__('Help', 'chatmaxima-ai-chatbot') . '</a>';
 
     array_unshift($links, $settings_link, $knowledge_link);
     return $links;

@@ -35,6 +35,8 @@ function chatmaxima_uninstall_site()
         'chatmaxima_selected_team',
         'chatmaxima_channel_alias',
         'chatmaxima_installed_channel',
+        'chatmaxima_setup',
+        'chatmaxima_last_full_sync',
     ];
     foreach ($options as $option)
     {

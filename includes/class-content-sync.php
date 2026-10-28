@@ -91,7 +91,45 @@ class ChatMaxima_Content_Sync
             return;
         }
 
-        $this->sync_post($post_id);
+        $this->sync_post($post_id); // can_sync_post() inside applies the post type selection and the exclude flag
+    }
+
+    /**
+     * The one rule for what may be sent to ChatMaxima: a published, public, password-free item of a selected post
+     * type that is not excluded. Every sync path (auto, single, bulk, sync all) goes through this.
+     */
+    public function can_sync_post($post_id)
+    {
+        $post = get_post($post_id);
+        if (!$post || $post->post_status !== 'publish' || $post->post_password !== '')
+        {
+            return false;
+        }
+        if (function_exists('is_post_publicly_viewable')) // WordPress 5.7+
+        {
+            if (!is_post_publicly_viewable($post))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            $post_type_object = get_post_type_object($post->post_type);
+            if (!$post_type_object || !$post_type_object->public)
+            {
+                return false;
+            }
+        }
+        $sync_post_types = (array) get_option('chatmaxima_sync_post_types', ['post', 'page']);
+        if (!in_array($post->post_type, $sync_post_types, true))
+        {
+            return false;
+        }
+        if (get_post_meta($post_id, '_chatmaxima_exclude_sync', true) === '1')
+        {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -133,6 +171,11 @@ class ChatMaxima_Content_Sync
      */
     public function sync_post($post_id)
     {
+        if (!$this->can_sync_post($post_id))
+        {
+            return false;
+        }
+
         $knowledge_source_alias = get_option('chatmaxima_knowledge_source_alias', '');
 
         if (empty($knowledge_source_alias))
@@ -288,9 +331,12 @@ class ChatMaxima_Content_Sync
 
         foreach ($post_ids as $post_id)
         {
-            $exclude = get_post_meta($post_id, '_chatmaxima_exclude_sync', true);
+            if (!current_user_can('edit_post', $post_id)) // the list table does not check this for custom bulk actions
+            {
+                continue;
+            }
 
-            if ($exclude === '1')
+            if (get_post_meta($post_id, '_chatmaxima_exclude_sync', true) === '1')
             {
                 continue;
             }
@@ -319,6 +365,11 @@ class ChatMaxima_Content_Sync
     public function bulk_action_admin_notice()
     {
         // Counts added to the redirect URL by handle_bulk_action(); display-only, so no nonce is needed
+        $screen = get_current_screen();
+        if (!$screen || $screen->base !== 'edit' || !current_user_can('edit_posts')) // only on the posts list the bulk action came from
+        {
+            return;
+        }
         // phpcs:disable WordPress.Security.NonceVerification.Recommended
         if (!empty($_REQUEST['chatmaxima_synced']) || !empty($_REQUEST['chatmaxima_failed']))
         {
@@ -414,7 +465,7 @@ add_action('wp_ajax_chatmaxima_sync_single_post', function() {
 
     $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0; // nonce checked by check_ajax_referer() above
 
-    if (!$post_id)
+    if (!$post_id || !current_user_can('edit_post', $post_id)) // only a post this user can edit, never any id
     {
         wp_send_json_error(['message' => __('Invalid post ID', 'chatmaxima-ai-chatbot')]);
     }
@@ -426,6 +477,11 @@ add_action('wp_ajax_chatmaxima_sync_single_post', function() {
         wp_send_json_error(['message' => __('Sync not initialized', 'chatmaxima-ai-chatbot')]);
     }
 
+    if (!$chatmaxima_content_sync->can_sync_post($post_id))
+    {
+        wp_send_json_error(['message' => __('Only published, public items of a selected content type can be synced.', 'chatmaxima-ai-chatbot')]);
+    }
+
     $result = $chatmaxima_content_sync->sync_post($post_id);
 
     if ($result)
@@ -435,6 +491,10 @@ add_action('wp_ajax_chatmaxima_sync_single_post', function() {
     else
     {
         $error = get_post_meta($post_id, '_chatmaxima_sync_error', true);
-        wp_send_json_error(['message' => $error ?: __('Sync failed', 'chatmaxima-ai-chatbot')]);
+        if ($error === '')
+        {
+            $error = __('Sync failed', 'chatmaxima-ai-chatbot');
+        }
+        wp_send_json_error(['message' => $error]);
     }
 });
