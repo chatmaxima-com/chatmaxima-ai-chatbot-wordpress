@@ -967,12 +967,27 @@ class ChatMaxima_Admin_Settings
         if (is_wp_error($result))
         {
             $error_msg = $result->get_error_message();
+            foreach ($posts as $post)
+            {
+                // Same per-post record as a single sync, so the meta box shows the error
+                update_post_meta($post->ID, '_chatmaxima_sync_status', 'error');
+                update_post_meta($post->ID, '_chatmaxima_sync_error', $error_msg);
+            }
             // Add context about which knowledge source was used
             if (strpos($error_msg, 'not found') !== false)
             {
                 $error_msg .= sprintf(' (alias: %s)', $knowledge_source_alias);
             }
             wp_send_json_error(['message' => $error_msg]);
+        }
+
+        $sync_date = current_time('mysql');
+        foreach ($posts as $post)
+        {
+            // Record each post as synced, as a single or bulk-action sync does, so the Posts column and meta box agree
+            update_post_meta($post->ID, '_chatmaxima_sync_status', 'synced');
+            update_post_meta($post->ID, '_chatmaxima_sync_date', $sync_date);
+            delete_post_meta($post->ID, '_chatmaxima_sync_error');
         }
 
         $synced = $offset + count($posts);

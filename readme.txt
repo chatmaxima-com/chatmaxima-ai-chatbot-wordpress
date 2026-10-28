@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.2
+Stable tag: 2.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.0.3 =
+* Fixed: after Sync All Content, posts still showed as not synced in the Posts list and the editor sync box
+
 = 2.0.2 =
 * Fixed: the Chatbot Widget channel list showed blank entries, so no channel could be selected or installed
 
@@ -176,6 +179,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.0.3 =
+Sync All Content now marks each post as synced. Run Sync All Content again to update the status of posts synced with an earlier version.
 
 = 2.0.2 =
 Fixes the empty channel list in Chatbot Widget settings. Update to select and install your chat widget.
