@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.1
+Stable tag: 2.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.0.2 =
+* Fixed: the Chatbot Widget channel list showed blank entries, so no channel could be selected or installed
+
 = 2.0.1 =
 * The chatbot widget now loads through wp_enqueue_script, so caching and optimization plugins handle it like any other script
 * All admin text is escaped on output and all form input is unslashed and sanitized
@@ -173,6 +176,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.0.2 =
+Fixes the empty channel list in Chatbot Widget settings. Update to select and install your chat widget.
 
 = 2.0.0 =
 Major update with knowledge source management and content sync features. After upgrading, connect your ChatMaxima account to access new features.

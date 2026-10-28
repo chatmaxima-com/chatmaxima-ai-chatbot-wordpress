@@ -843,16 +843,18 @@ jQuery(document).ready(function($) {
                     var foundSelected = false;
                     if (channels && channels.length > 0) {
                         channels.forEach(function(channel) {
-                            var displayName = channel.name || channel.alias;
+                            // API v2 returns the channel alias as account_id and its name as account_name; older responses used alias and name
+                            var channelAlias = channel.account_id || channel.alias;
+                            var displayName = channel.account_name || channel.name || channelAlias;
                             var $option = $('<option></option>')
-                                .val(channel.alias)
+                                .val(channelAlias)
                                 .text(displayName)
                                 .data('channel', channel);
 
-                            if (selected && channel.alias === selected) {
+                            if (selected && channelAlias === selected) {
                                 $option.prop('selected', true);
                                 foundSelected = true;
-                                console.log('Selected channel found:', channel.alias); // Debug
+                                console.log('Selected channel found:', channelAlias); // Debug
                             }
 
                             $select.append($option);
