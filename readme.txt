@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.3
+Stable tag: 2.0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,12 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.0.4 =
+* New settings page layout: a setup tracker across the top and a two-column view that uses the full screen width
+* Auto Sync and the post types to sync now save as soon as you change them (they were not saved before)
+* Show the chat widget to visitors with one switch, with the live status shown above it
+* Knowledge source details shown as documents, storage and type at a glance
+
 = 2.0.3 =
 * Fixed: after Sync All Content, posts still showed as not synced in the Posts list and the editor sync box
 
@@ -179,6 +185,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.0.4 =
+Redesigned settings page. Auto Sync and post type choices now save correctly; check them after updating.
 
 = 2.0.3 =
 Sync All Content now marks each post as synced. Run Sync All Content again to update the status of posts synced with an earlier version.

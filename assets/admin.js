@@ -29,6 +29,118 @@ jQuery(document).ready(function($) {
     // Max retry attempts
     var maxRetries = 2;
 
+    var strings = chatmaximaAdmin.strings || {};
+
+    // Published items in the selected post types and how many are synced (from PHP, updated after a sync)
+    var syncState = {
+        total: parseInt(chatmaximaAdmin.totalPosts, 10) || 0,
+        synced: parseInt(chatmaximaAdmin.syncedPosts, 10) || 0
+    };
+
+    // Whether the widget is shown to visitors
+    var widgetLive = !!chatmaximaAdmin.widgetInstalled;
+
+    /**
+     * Fill a "%1$s of %2$s" style string
+     */
+    function formatText(template, first, second) {
+        return String(template || '').replace('%1$s', first).replace('%2$s', second);
+    }
+
+    /**
+     * Synced-items meter in the Content sync card
+     */
+    function renderSyncCount() {
+        var $count = $('#cm-sync-count');
+        if ($count.length === 0) {
+            return;
+        }
+        var synced = Math.min(syncState.synced, syncState.total);
+        var percent = 0;
+        if (syncState.total > 0) {
+            percent = Math.round((synced / syncState.total) * 100);
+        }
+        $('#cm-sync-meter').css('width', percent + '%');
+        $count.text(formatText(strings.syncedOf, synced.toLocaleString(), syncState.total.toLocaleString()));
+    }
+
+    /**
+     * Set one setup step's state ('done', 'partial' or '') and its subtitle
+     */
+    function setStep(name, state, subtitle) {
+        var $step = $('#chatmaxima-steps .cm-step[data-step="' + name + '"]');
+        $step.removeClass('is-done is-partial is-current');
+        if (state) {
+            $step.addClass('is-' + state);
+        }
+        if (subtitle) {
+            $('#cm-step-' + name + '-sub').text(subtitle);
+        }
+    }
+
+    /**
+     * Recompute the setup tracker from what is on the page
+     */
+    function updateSteps() {
+        if ($('#chatmaxima-steps').length === 0) {
+            return;
+        }
+
+        var $ks = $('#chatmaxima_knowledge_source option:selected');
+        if ($ks.val()) {
+            var source = $ks.data('source');
+            var ksName = $ks.text();
+            if (source && source.name) {
+                ksName = source.name;
+            }
+            setStep('knowledge', 'done', ksName);
+        } else {
+            setStep('knowledge', '', strings.stepKnowledgeNone);
+        }
+
+        var synced = Math.min(syncState.synced, syncState.total);
+        if (synced === 0) {
+            setStep('sync', '', strings.stepSyncNone);
+        } else if (synced >= syncState.total) {
+            setStep('sync', 'done', formatText(strings.syncedOf, synced.toLocaleString(), syncState.total.toLocaleString()));
+        } else {
+            setStep('sync', 'partial', formatText(strings.syncedOf, synced.toLocaleString(), syncState.total.toLocaleString()));
+        }
+
+        if (widgetLive) {
+            setStep('widget', 'done', strings.stepWidgetLive);
+        } else if ($('#chatmaxima_channel').val()) {
+            setStep('widget', 'partial', strings.stepWidgetPicked);
+        } else {
+            setStep('widget', '', strings.stepWidgetNone);
+        }
+
+        // Highlight the first step that still needs attention
+        var $next = $('#chatmaxima-steps .cm-step').not('.is-done, .is-partial').first();
+        if ($next.length === 0) {
+            $next = $('#chatmaxima-steps .cm-step.is-partial').first();
+        }
+        $next.addClass('is-current');
+    }
+
+    /**
+     * Widget status banner and switch
+     */
+    function renderWidgetState() {
+        var $state = $('#chatmaxima-widget-state');
+        $state.toggleClass('is-live', widgetLive).toggleClass('is-off', !widgetLive);
+        if (widgetLive) {
+            $('#chatmaxima-widget-state-text').text(strings.widgetLive);
+        } else {
+            $('#chatmaxima-widget-state-text').text(strings.widgetOff);
+        }
+        $('#chatmaxima-live-toggle').prop('checked', widgetLive);
+    }
+
+    renderSyncCount();
+    renderWidgetState();
+    updateSteps();
+
     // Load teams, knowledge sources, and channels on page load if authenticated
     // Load sequentially to avoid race conditions with token refresh
     if (chatmaximaAdmin.isAuthenticated) {
@@ -217,8 +329,10 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 // Update details panel if it exists
                 updateKsDetails(alias);
+                updateSteps();
             }
         });
+        updateSteps();
     });
 
     /**
@@ -264,6 +378,55 @@ jQuery(document).ready(function($) {
             }
         });
     });
+
+    /**
+     * Save post types and Auto Sync as soon as they change (they had no save path before)
+     */
+    var saveSyncSettingsTimer = null;
+    $(document).on('change', '.chatmaxima-sync-post-type, #chatmaxima_auto_sync', function() {
+        clearTimeout(saveSyncSettingsTimer);
+        saveSyncSettingsTimer = setTimeout(saveSyncSettings, 300); // a burst of chip clicks saves once
+    });
+
+    function saveSyncSettings() {
+        var $message = $('#chatmaxima-sync-settings-message');
+        var postTypes = [];
+        $('.chatmaxima-sync-post-type:checked').each(function() {
+            postTypes.push($(this).val());
+        });
+        var autoSync = '0';
+        if ($('#chatmaxima_auto_sync').is(':checked')) {
+            autoSync = '1';
+        }
+
+        $.ajax({
+            url: chatmaximaAdmin.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'chatmaxima_save_sync_settings',
+                nonce: chatmaximaAdmin.nonce,
+                post_types: postTypes,
+                auto_sync: autoSync
+            },
+            success: function(response) {
+                if (response.success) {
+                    syncState.total = parseInt(response.data.total, 10) || 0;
+                    syncState.synced = parseInt(response.data.synced, 10) || 0;
+                    renderSyncCount();
+                    updateSteps();
+                    showMessage($message, strings.saved, 'success');
+                    setTimeout(function() {
+                        $message.removeClass('success').text('');
+                    }, 1800);
+                } else {
+                    showMessage($message, (response.data && response.data.message) || strings.saveFailed, 'error');
+                }
+            },
+            error: function() {
+                showMessage($message, strings.saveFailed, 'error');
+            }
+        });
+    }
 
     /**
      * Sync all content handler
@@ -361,6 +524,7 @@ jQuery(document).ready(function($) {
                             updateKsDetails(selected);
                         }
                     }
+                    updateSteps();
                     $btn.prop('disabled', false).text('Refresh');
 
                     // Load channels after knowledge sources loaded successfully
@@ -568,6 +732,12 @@ jQuery(document).ready(function($) {
                     if (data.complete) {
                         showMessage($message, chatmaximaAdmin.strings.syncComplete + ' ' + data.synced + ' items synced.', 'success');
                         $btn.prop('disabled', false);
+                        // Every item in the run was sent and marked synced
+                        syncState.total = parseInt(data.total, 10) || syncState.total;
+                        syncState.synced = parseInt(data.synced, 10) || 0;
+                        renderSyncCount();
+                        updateSteps();
+                        loadKnowledgeSources(); // refresh the document count
                         setTimeout(function() {
                             $progress.hide();
                         }, 2000);
@@ -619,12 +789,21 @@ jQuery(document).ready(function($) {
                 success: function(response) {
                     if (response.success) {
                         showMessage($('#chatmaxima-channel-message'), 'Channel selected', 'success');
+                        if (widgetLive) {
+                            // The widget is live: move it to the newly selected channel
+                            $.post(chatmaximaAdmin.ajaxUrl, {
+                                action: 'chatmaxima_install_widget',
+                                nonce: chatmaximaAdmin.nonce,
+                                alias: alias
+                            });
+                        }
                     }
                 }
             });
         } else {
             $('#chatmaxima-widget-script').hide();
         }
+        updateSteps();
     });
 
     /**
@@ -679,7 +858,7 @@ jQuery(document).ready(function($) {
                 delete window.ChatMaxima;
             }
 
-            $btn.text('Preview Widget');
+            $btn.text(strings.previewWidget || 'Preview Widget');
             showMessage($('#chatmaxima-install-message'), 'Preview widget removed. Refresh the page if the widget is still visible.', 'success');
             return;
         }
@@ -700,11 +879,11 @@ jQuery(document).ready(function($) {
         widgetScript.defer = true;
         widgetScript.onload = function() {
             previewWidgetLoaded = true;
-            $btn.prop('disabled', false).text('Hide Preview');
+            $btn.prop('disabled', false).text(strings.hidePreview || 'Hide Preview');
             showMessage($('#chatmaxima-install-message'), 'Widget preview loaded! You can now test the chatbot.', 'success');
         };
         widgetScript.onerror = function() {
-            $btn.prop('disabled', false).text('Preview Widget');
+            $btn.prop('disabled', false).text(strings.previewWidget || 'Preview Widget');
             showMessage($('#chatmaxima-install-message'), 'Failed to load widget preview', 'error');
         };
         document.body.appendChild(widgetScript);
@@ -715,8 +894,13 @@ jQuery(document).ready(function($) {
      */
     $('#chatmaxima-copy-script-btn').on('click', function() {
         var scriptCode = $('#chatmaxima-script-code').text();
+        var $copyBtn = $(this);
+        var copyLabel = $copyBtn.text();
         navigator.clipboard.writeText(scriptCode).then(function() {
-            showMessage($('#chatmaxima-install-message'), 'Script copied to clipboard!', 'success');
+            $copyBtn.text(strings.copied || 'Copied');
+            setTimeout(function() {
+                $copyBtn.text(copyLabel);
+            }, 1500);
         }).catch(function() {
             // Fallback for older browsers
             var $temp = $('<textarea>');
@@ -729,74 +913,59 @@ jQuery(document).ready(function($) {
     });
 
     /**
-     * Install widget button handler
+     * "Show on your site" switch: installs or removes the widget for visitors
      */
-    $('#chatmaxima-install-widget-btn').on('click', function() {
+    $('#chatmaxima-live-toggle').on('change', function() {
+        var $toggle = $(this);
+        var turnOn = $toggle.is(':checked');
         var alias = $('#chatmaxima_channel').val();
-        var $btn = $(this);
+        var $message = $('#chatmaxima-install-message');
 
-        if (!alias) {
-            showMessage($('#chatmaxima-install-message'), 'Please select a channel first', 'error');
+        if (turnOn && !alias) {
+            $toggle.prop('checked', false);
+            showMessage($message, strings.selectChannelFirst, 'error');
             return;
         }
 
-        $btn.prop('disabled', true).text('Installing...');
+        $toggle.prop('disabled', true);
+        if (turnOn) {
+            $message.removeClass('success error').text(strings.enabling);
+        } else {
+            $message.removeClass('success error').text(strings.disabling);
+        }
 
-        $.ajax({
-            url: chatmaximaAdmin.ajaxUrl,
-            type: 'POST',
-            data: {
+        var data = {
+            action: 'chatmaxima_uninstall_widget',
+            nonce: chatmaximaAdmin.nonce
+        };
+        if (turnOn) {
+            data = {
                 action: 'chatmaxima_install_widget',
                 nonce: chatmaximaAdmin.nonce,
                 alias: alias
-            },
-            success: function(response) {
-                if (response.success) {
-                    showMessage($('#chatmaxima-install-message'), response.data.message, 'success');
-                    $('#chatmaxima-install-widget-btn').hide();
-                    $('#chatmaxima-uninstall-widget-btn').show();
-                    $('#chatmaxima-widget-status').show();
-                } else {
-                    showMessage($('#chatmaxima-install-message'), response.data.message || 'Installation failed', 'error');
-                }
-                $btn.prop('disabled', false).text('Install Widget');
-            },
-            error: function() {
-                showMessage($('#chatmaxima-install-message'), 'Installation failed. Please try again.', 'error');
-                $btn.prop('disabled', false).text('Install Widget');
-            }
-        });
-    });
-
-    /**
-     * Uninstall widget button handler
-     */
-    $('#chatmaxima-uninstall-widget-btn').on('click', function() {
-        var $btn = $(this);
-
-        $btn.prop('disabled', true).text('Uninstalling...');
+            };
+        }
 
         $.ajax({
             url: chatmaximaAdmin.ajaxUrl,
             type: 'POST',
-            data: {
-                action: 'chatmaxima_uninstall_widget',
-                nonce: chatmaximaAdmin.nonce
-            },
+            data: data,
             success: function(response) {
+                $toggle.prop('disabled', false);
                 if (response.success) {
-                    showMessage($('#chatmaxima-install-message'), response.data.message, 'success');
-                    $('#chatmaxima-uninstall-widget-btn').hide();
-                    $('#chatmaxima-install-widget-btn').show();
-                    $('#chatmaxima-widget-status').hide();
+                    widgetLive = turnOn;
+                    showMessage($message, response.data.message, 'success');
                 } else {
-                    showMessage($('#chatmaxima-install-message'), response.data.message || 'Uninstallation failed', 'error');
+                    $toggle.prop('checked', widgetLive); // put the switch back
+                    showMessage($message, (response.data && response.data.message) || strings.saveFailed, 'error');
                 }
-                $btn.prop('disabled', false).text('Uninstall Widget');
+                renderWidgetState();
+                updateSteps();
             },
             error: function() {
-                showMessage($('#chatmaxima-install-message'), 'Uninstallation failed. Please try again.', 'error');
-                $btn.prop('disabled', false).text('Uninstall Widget');
+                $toggle.prop('disabled', false).prop('checked', widgetLive);
+                showMessage($message, strings.saveFailed, 'error');
+                renderWidgetState();
             }
         });
     });
@@ -866,15 +1035,12 @@ jQuery(document).ready(function($) {
                             updateScriptPreview(selected);
                         }
 
-                        // Show count message with selected info
-                        if (foundSelected) {
-                            $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available - ' + selected + ' selected').addClass('success');
-                        } else {
-                            $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available').addClass('success');
-                        }
+                        // The selected channel's name is already in the dropdown, so only the count is shown
+                        $('#chatmaxima-channel-message').text(channels.length + ' channel(s) available').addClass('success');
                     } else {
                         $('#chatmaxima-channel-message').text('No web channels found. Create one in ChatMaxima dashboard.').addClass('error');
                     }
+                    updateSteps();
                     $btn.prop('disabled', false).text('Refresh');
                 } else {
                     // Retry on failure

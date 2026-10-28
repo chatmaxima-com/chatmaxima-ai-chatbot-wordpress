@@ -3,7 +3,7 @@
  * Plugin Name: ChatMaxima AI Chatbot
  * Plugin URI: https://chatmaxima.com/
  * Description: AI-powered chatbot integration for WordPress with customizable themes, social media support, and knowledge source management.
- * Version: 2.0.3
+ * Version: 2.0.4
  * Author: ChatMaxima
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -19,7 +19,7 @@ if (!defined('ABSPATH'))
 // Define plugin constants
 define('CHATMAXIMA_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CHATMAXIMA_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('CHATMAXIMA_VERSION', '2.0.3');
+define('CHATMAXIMA_VERSION', '2.0.4');
 
 // Include required files
 require_once CHATMAXIMA_PLUGIN_PATH . 'includes/class-api-client.php';
