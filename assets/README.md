@@ -4,7 +4,8 @@ This directory should contain the following WordPress.org plugin assets:
 
 ## Required Images (for WordPress.org submission)
 
-1. **icon-128x128.png** - Plugin icon (128x128 pixels)
+1. **icon-128x128.png** - Plugin icon (128x128 pixels), WordPress.org listing only
+   **chatmaxima-mark.png** - the same mark shipped inside the plugin for the admin page header
 2. **icon-256x256.png** - Plugin icon (256x256 pixels, optional but recommended)
 3. **banner-772x250.png** - Plugin banner (772x250 pixels)
 4. **banner-1544x500.png** - Plugin banner for high-DPI displays (1544x500 pixels, optional)

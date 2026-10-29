@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.3
+Stable tag: 2.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,11 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.4 =
+* Fixed: the ChatMaxima mark in the page header did not load on sites installed from WordPress.org (the file was not in the plugin package)
+* The chatbot's instructions always follow the chosen role, tone and description, even before ChatMaxima has read your content; the AI-written version replaces them once it has (server-side change)
+* Home explains when ChatMaxima could not read your pages, with the reason, instead of asking you to try again later
+
 = 2.1.3 =
 * Fixed: the edit pages opened from Home (Edit persona, Change model, Edit content types, Change channel) rendered in a narrow column with the preview overlapping the form
 * Signing out and back in with the same ChatMaxima account keeps the finished setup, including its workspace; a different account starts setup fresh
@@ -197,6 +202,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.4 =
+Fixes the missing header logo; role and tone changes now always apply to the chatbot.
 
 = 2.1.3 =
 Fixes the edit pages opened from Home and keeps your setup when you sign out and back in.

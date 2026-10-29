@@ -310,7 +310,7 @@ class ChatMaxima_Setup_Wizard
         <div class="wrap cmw-wrap">
             <h1 class="screen-reader-text"><?php esc_html_e('ChatMaxima AI Chatbot', 'chatmaxima-ai-chatbot'); ?></h1>
             <div class="cmw-header">
-                <img class="cmw-logo" src="<?php echo esc_url(CHATMAXIMA_PLUGIN_URL . 'assets/icon-128x128.png'); ?>" alt="" width="36" height="36">
+                <img class="cmw-logo" src="<?php echo esc_url(CHATMAXIMA_PLUGIN_URL . 'assets/chatmaxima-mark.png'); ?>" alt="" width="36" height="36">
                 <div class="cmw-header-text">
                     <div class="cmw-title"><?php esc_html_e('ChatMaxima AI Chatbot', 'chatmaxima-ai-chatbot'); ?></div>
                     <div class="cmw-subtitle" id="cmw-subtitle"><?php esc_html_e('Add an AI chatbot that answers visitors from your own posts and pages.', 'chatmaxima-ai-chatbot'); ?></div>
@@ -337,7 +337,7 @@ class ChatMaxima_Setup_Wizard
         ?>
         <div class="wrap cmw-wrap">
             <div class="cmw-header">
-                <img class="cmw-logo" src="<?php echo esc_url(CHATMAXIMA_PLUGIN_URL . 'assets/icon-128x128.png'); ?>" alt="" width="36" height="36">
+                <img class="cmw-logo" src="<?php echo esc_url(CHATMAXIMA_PLUGIN_URL . 'assets/chatmaxima-mark.png'); ?>" alt="" width="36" height="36">
                 <div class="cmw-header-text">
                     <div class="cmw-title"><?php esc_html_e('Help', 'chatmaxima-ai-chatbot'); ?></div>
                     <div class="cmw-subtitle"><?php esc_html_e('Answers to common questions about the ChatMaxima plugin.', 'chatmaxima-ai-chatbot'); ?></div>
@@ -1242,10 +1242,12 @@ class ChatMaxima_Setup_Wizard
             'startFresh' => __('Need to start fresh?', 'chatmaxima-ai-chatbot'),
             'resetPlugin' => __('Reset plugin and run setup again', 'chatmaxima-ai-chatbot'),
             'resetConfirm' => __('Reset the plugin? This signs out, switches the widget off and starts setup again. Your ChatMaxima account, knowledge source and chatbot are kept.', 'chatmaxima-ai-chatbot'),
-            'promptPending' => __('The chatbot\'s instructions were written before your content finished indexing.', 'chatmaxima-ai-chatbot'),
+            'promptPending' => __('The chatbot\'s instructions follow your persona choices only. Once ChatMaxima has read your content, rewrite them from it.', 'chatmaxima-ai-chatbot'),
+            /* translators: %s: reason ChatMaxima could not read the pages */
+            'promptUnreadable' => __('The chatbot answers from its persona only, because ChatMaxima could not read any of your synced pages: %s Fix the site address, run Sync now, then rewrite the instructions from your content.', 'chatmaxima-ai-chatbot'),
             'rewritePrompt' => __('Rewrite from my content', 'chatmaxima-ai-chatbot'),
             'promptRewritten' => __('Instructions rewritten from your content.', 'chatmaxima-ai-chatbot'),
-            'stillIndexing' => __('Your content is still being indexed. Try again in a few minutes.', 'chatmaxima-ai-chatbot'),
+            'stillIndexing' => __('ChatMaxima has not read your content yet. Check "Read by ChatMaxima" on the Knowledge card and try again once pages have been read.', 'chatmaxima-ai-chatbot'),
             'botMissing' => __('The chatbot was removed in ChatMaxima. Run the Chatbot step to create a new one.', 'chatmaxima-ai-chatbot'),
             'createChatbot' => __('Create chatbot', 'chatmaxima-ai-chatbot'),
             'saved' => __('Saved', 'chatmaxima-ai-chatbot'),

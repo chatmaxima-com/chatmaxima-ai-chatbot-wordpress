@@ -1639,21 +1639,34 @@
                 row(S.welcome, '"' + esc(welcome) + '"') + '</tbody></table>');
             $('#cmw-home-bot-pill').text(S.answering).addClass('cmw-pill-ok');
             if (bot.prompt_status === 'default') {
-                $('#cmw-home-banner').html('<div class="cmw-banner">' + esc(S.promptPending) + ' <button type="button" class="button" id="cmw-rewrite">' + esc(S.rewritePrompt) + '</button></div>');
-                $('#cmw-rewrite').on('click', function () {
-                    var $button = $(this);
-                    busy($button, S.saving);
-                    post('chatmaxima_wiz_save_bot', { regenerate_prompt: '1' }).done(function (result) {
-                        if (result.bot && result.bot.prompt_status === 'generated') {
-                            $('#cmw-home-banner').empty();
-                            notice(S.promptRewritten, 'success');
-                            return;
-                        }
-                        unbusy($button);
-                        notice(S.stillIndexing, 'warning');
-                    }).fail(function (error) {
-                        unbusy($button);
-                        notice(error.message, 'error');
+                // Which message depends on whether ChatMaxima has read any page yet, and why not
+                post('chatmaxima_wiz_training_status').always(function (status) {
+                    var unreadable = status && status.total && !status.indexed && status.reason;
+                    var text = S.promptPending;
+                    if (unreadable) {
+                        text = fmt(S.promptUnreadable, status.reason);
+                    }
+                    var html = '<div class="cmw-banner">' + esc(text);
+                    if (!unreadable) {
+                        html += ' <button type="button" class="button" id="cmw-rewrite">' + esc(S.rewritePrompt) + '</button>';
+                    }
+                    html += '</div>';
+                    $('#cmw-home-banner').html(html);
+                    $('#cmw-rewrite').on('click', function () {
+                        var $button = $(this);
+                        busy($button, S.saving);
+                        post('chatmaxima_wiz_save_bot', { regenerate_prompt: '1' }).done(function (result) {
+                            if (result.bot && result.bot.prompt_status === 'generated') {
+                                $('#cmw-home-banner').empty();
+                                notice(S.promptRewritten, 'success');
+                                return;
+                            }
+                            unbusy($button);
+                            notice(S.stillIndexing, 'warning');
+                        }).fail(function (error) {
+                            unbusy($button);
+                            notice(error.message, 'error');
+                        });
                     });
                 });
             }
