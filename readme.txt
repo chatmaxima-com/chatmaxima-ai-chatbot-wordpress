@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 2.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.2 =
+* The workspace name now shows on the Install step and on Home (it was blank after signing in)
+
 = 2.1.1 =
 * The Knowledge step and Home now show how many synced pages ChatMaxima has actually read, with the reason when a page could not be read
 * A warning when the site is not reachable from the internet (localhost, a private address or a development domain), since ChatMaxima cannot read such pages
@@ -188,6 +191,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.2 =
+Shows the workspace name on Install and Home.
 
 = 2.1.1 =
 Shows whether ChatMaxima has read your synced pages, and warns on sites it cannot reach.

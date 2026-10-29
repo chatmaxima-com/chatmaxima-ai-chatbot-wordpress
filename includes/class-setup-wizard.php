@@ -472,9 +472,23 @@ class ChatMaxima_Setup_Wizard
             $current = $user_info['team_alias'];
         }
         $teams = [];
-        if (isset($result['teams']))
+        if (isset($result['teams']) && is_array($result['teams']))
         {
             $teams = $result['teams'];
+        }
+        // The sign-in response carries the workspace alias but not its name; fill it in from the list so Install
+        // and Home can show "Workspace: Acme Bakery" instead of a blank
+        if (is_array($user_info) && empty($user_info['team_name']) && $current !== '')
+        {
+            foreach ($teams as $team)
+            {
+                if (is_array($team) && isset($team['team_alias'], $team['team_name']) && $team['team_alias'] === $current)
+                {
+                    $user_info['team_name'] = sanitize_text_field((string) $team['team_name']);
+                    update_option('chatmaxima_user_info', $user_info, false);
+                    break;
+                }
+            }
         }
         wp_send_json_success(['teams' => $teams, 'current' => $current]);
     }

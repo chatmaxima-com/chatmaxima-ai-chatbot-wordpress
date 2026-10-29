@@ -459,6 +459,14 @@
     function loadTeams() {
         return post('chatmaxima_wiz_teams').done(function (data) {
             ui.teams = data.teams || [];
+            if (!C.user.teamName) { // the sign-in response has the alias only; take the name from the list
+                $.each(ui.teams, function (i, team) {
+                    if (team.team_alias === C.user.teamAlias) {
+                        C.user.teamName = team.team_name;
+                    }
+                });
+                $('#cmw-workspace-name').text(C.user.teamName || '');
+            }
         });
     }
 
@@ -1345,7 +1353,7 @@
         html += '<h3 class="cmw-h3">' + esc(S.webChannel) + '</h3><div id="cmw-channel"><p class="cmw-muted"><span class="spinner is-active"></span> ' + esc(S.settingUpChannel) + '</p></div>';
         html += '<h3 class="cmw-h3">' + esc(S.aboutToFinish) + '</h3><table class="cmw-summary"><tbody>';
         html += '<tr><th>' + esc(S.account) + '</th><td>' + esc(C.user.email) + '</td></tr>';
-        html += '<tr><th>' + esc(S.workspace) + '</th><td>' + esc(C.user.teamName) + '</td></tr>';
+        html += '<tr><th>' + esc(S.workspace) + '</th><td id="cmw-workspace-name">' + esc(C.user.teamName) + '</td></tr>';
         html += '<tr><th>' + esc(S.chatbot) + '</th><td>' + esc(name) + '</td></tr>';
         html += '<tr><th>' + esc(S.aiModel) + '</th><td>' + esc(C.state.model_label || 'MaxIA V4') + '</td></tr>';
         html += '</tbody></table></div>';
@@ -1355,6 +1363,9 @@
         html += footer(back, right);
         renderShell(html);
         renderLiveStatus(live);
+        if (!C.user.teamName) {
+            loadTeams();
+        }
 
         $('#cmw-install-back').on('click', function () {
             ui.chatbotTab = 'model';
@@ -1496,7 +1507,7 @@
         // Connection
         html += card('admin-links', S.connection, '<span class="cmw-pill cmw-pill-ok">' + esc(S.connected) + '</span>',
             row(S.account, '<strong>' + esc(C.user.name) + '</strong> · ' + esc(C.user.email)) +
-            row(S.workspace, esc(C.user.teamName)) +
+            row(S.workspace, '<span id="cmw-workspace-name">' + esc(C.user.teamName) + '</span>') +
             (C.state.completed_at ? row(S.connectedOn, esc(String(C.state.completed_at).split(' ')[0])) : ''),
             '<button type="button" class="button" id="cmw-other-account">' + esc(S.differentAccount) + '</button><button type="button" class="cmw-link-btn cmw-danger" id="cmw-disconnect">' + esc(S.disconnect) + '</button>');
 
@@ -1549,6 +1560,9 @@
         loadHomeBot();
         loadHomeKnowledgeName();
         loadReadStatus($('#cmw-home-read'));
+        if (!C.user.teamName) {
+            loadTeams();
+        }
 
         $('#cmw-home-auto').on('change', function () {
             C.autoSync = $(this).is(':checked');
