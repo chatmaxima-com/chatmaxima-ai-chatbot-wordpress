@@ -117,6 +117,10 @@
     align-items: start;
 }
 
+.cmw-layout-single {
+    grid-template-columns: minmax(0, 1fr); /* edit pages opened from Home have no step sidebar */
+}
+
 .cmw-steps {
     background: var(--cmw-panel);
     border: 1px solid var(--cmw-border);

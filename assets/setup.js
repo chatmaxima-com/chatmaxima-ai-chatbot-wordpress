@@ -217,7 +217,7 @@
     function renderShell(inner) {
         var list = steps();
         var current = stepIndex(ui.step);
-        var html = '<div class="cmw-layout">';
+        var html = '<div class="cmw-layout' + (C.editing ? ' cmw-layout-single' : '') + '">';
         if (!C.editing) {
             html += '<aside class="cmw-steps" aria-label="' + esc(fmt(S.setupSteps, list.length)) + '">';
             html += '<div class="cmw-steps-head">' + esc(fmt(S.setupSteps, list.length)) + '</div><ol>';

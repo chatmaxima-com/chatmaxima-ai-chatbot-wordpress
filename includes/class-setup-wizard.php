@@ -72,7 +72,8 @@ class ChatMaxima_Setup_Wizard
             'bot_name' => '',
             'model_label' => '',
             'workspace_confirmed' => false,
-            'completed_at' => ''
+            'completed_at' => '',
+            'team_alias' => ''
         ], $state);
     }
 
@@ -81,6 +82,51 @@ class ChatMaxima_Setup_Wizard
         $state = array_merge(self::get_state(), $changes);
         update_option(self::STATE_OPTION, $state, false);
         return $state;
+    }
+
+    /**
+     * After a sign-in: if it is the account the setup was done with, keep the setup and move back to its workspace;
+     * if it is another account, the knowledge source, chatbot and channel belong to someone else, so start again.
+     */
+    public function reconcile_account()
+    {
+        $user_info = get_option('chatmaxima_user_info', []);
+        $last = get_option('chatmaxima_last_account', []);
+        $state = self::get_state();
+        if (!is_array($user_info) || empty($user_info['email']))
+        {
+            return;
+        }
+        $same_account = is_array($last) && !empty($last['email']) && strtolower($last['email']) === strtolower($user_info['email']);
+        if ($same_account)
+        {
+            $setup_team = '';
+            if (!empty($state['team_alias']))
+            {
+                $setup_team = $state['team_alias'];
+            }
+            else if (!empty($last['team_alias']))
+            {
+                $setup_team = $last['team_alias'];
+            }
+            $current_team = isset($user_info['team_alias']) ? $user_info['team_alias'] : '';
+            if ($setup_team !== '' && $setup_team !== $current_team) // sign-in lands on the default workspace; the setup lives in another
+            {
+                $switched = $this->api_client->switch_team($setup_team);
+                if (is_wp_error($switched))
+                {
+                    $same_account = false; // the workspace is gone or no longer shared with this account
+                }
+            }
+        }
+        if (!$same_account)
+        {
+            foreach (['chatmaxima_knowledge_source_alias', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_selected_team', 'chatmaxima_last_full_sync', self::STATE_OPTION] as $option)
+            {
+                delete_option($option);
+            }
+        }
+        delete_option('chatmaxima_last_account');
     }
 
     /**
@@ -520,7 +566,7 @@ class ChatMaxima_Setup_Wizard
         }
 
         $user_info = get_option('chatmaxima_user_info', []);
-        $state = self::save_state(['workspace_confirmed' => true, 'step' => 'knowledge']);
+        $state = self::save_state(['workspace_confirmed' => true, 'step' => 'knowledge', 'team_alias' => isset($user_info['team_alias']) ? $user_info['team_alias'] : '']);
         wp_send_json_success([
             'state' => $state,
             'teamName' => isset($user_info['team_name']) ? $user_info['team_name'] : ''
@@ -872,7 +918,8 @@ class ChatMaxima_Setup_Wizard
         {
             $this->api_client->update_chatbot($state['bot_alias'], ['regenerate_prompt' => true]); // best effort: Home offers it again
         }
-        $state = self::save_state(['completed' => true, 'completed_at' => current_time('mysql'), 'step' => 'install']);
+        $user_info = get_option('chatmaxima_user_info', []);
+        $state = self::save_state(['completed' => true, 'completed_at' => current_time('mysql'), 'step' => 'install', 'team_alias' => isset($user_info['team_alias']) ? $user_info['team_alias'] : '']);
         wp_send_json_success(['state' => $state, 'homeUrl' => admin_url('admin.php?page=' . self::PAGE_SLUG)]);
     }
 
@@ -883,7 +930,7 @@ class ChatMaxima_Setup_Wizard
     {
         $this->guard(false);
         $this->api_client->clear_tokens();
-        foreach (['chatmaxima_user_info', 'chatmaxima_knowledge_source_alias', 'chatmaxima_selected_team', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_last_full_sync', self::STATE_OPTION] as $option)
+        foreach (['chatmaxima_user_info', 'chatmaxima_last_account', 'chatmaxima_knowledge_source_alias', 'chatmaxima_selected_team', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_last_full_sync', self::STATE_OPTION] as $option)
         {
             delete_option($option);
         }

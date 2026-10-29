@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.2
+Stable tag: 2.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,12 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.3 =
+* Fixed: the edit pages opened from Home (Edit persona, Change model, Edit content types, Change channel) rendered in a narrow column with the preview overlapping the form
+* Signing out and back in with the same ChatMaxima account keeps the finished setup, including its workspace; a different account starts setup fresh
+* The chatbot preview no longer leaves test conversations in the ChatMaxima inbox (server-side change)
+* A chatbot created by the plugin no longer appears a second time under Knowledge Sources in ChatMaxima (server-side change)
+
 = 2.1.2 =
 * The workspace name now shows on the Install step and on Home (it was blank after signing in)
 
@@ -191,6 +197,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.3 =
+Fixes the edit pages opened from Home and keeps your setup when you sign out and back in.
 
 = 2.1.2 =
 Shows the workspace name on Install and Home.

@@ -165,6 +165,8 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => $result->get_error_message(), 'code' => $result->get_error_code()]);
         }
 
+        $this->wizard->reconcile_account(); // same account as before: keep the setup; another account: start fresh
+
         wp_send_json_success(['message' => __('Connected successfully', 'chatmaxima-ai-chatbot')]);
     }
 
@@ -218,6 +220,8 @@ class ChatMaxima_Admin_Settings
             wp_send_json_success(['verification_required' => true, 'email' => $email]);
         }
 
+        $this->wizard->reconcile_account();
+
         wp_send_json_success(['message' => __('Account created and connected', 'chatmaxima-ai-chatbot')]);
     }
 
@@ -233,11 +237,15 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Permission denied', 'chatmaxima-ai-chatbot')]);
         }
 
+        // Remember who was signed in: the setup, knowledge source and channel are kept, and the next sign-in with the
+        // same account picks them up again (ChatMaxima_Setup_Wizard::reconcile_account); a different account starts fresh
+        $user_info = get_option('chatmaxima_user_info', []);
+        if (is_array($user_info) && !empty($user_info['email']))
+        {
+            update_option('chatmaxima_last_account', ['email' => $user_info['email'], 'team_alias' => isset($user_info['team_alias']) ? $user_info['team_alias'] : ''], false);
+        }
         $this->api_client->clear_tokens();
         delete_option('chatmaxima_user_info');
-        delete_option('chatmaxima_knowledge_source_alias');
-        delete_option('chatmaxima_selected_team');
-        delete_option('chatmaxima_setup'); // the setup wizard starts again for the next account
 
         wp_send_json_success(['message' => __('Disconnected successfully', 'chatmaxima-ai-chatbot')]);
     }
