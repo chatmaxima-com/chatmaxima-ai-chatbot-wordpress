@@ -562,6 +562,9 @@
 
     function renderKnowledge() {
         var html = '<h2 class="cmw-h">' + esc(S.knowledgeTitle) + '</h2><p class="cmw-intro">' + esc(S.knowledgeIntro) + '</p>';
+        if (C.site.isLocal) {
+            html += '<div class="cmw-inline-warning">' + esc(fmt(S.localSite, C.site.host)) + '</div>';
+        }
         html += '<div class="cmw-section"><h3 class="cmw-h3">' + esc(S.knowledgeSource) + '</h3><div class="cmw-ks" id="cmw-ks"><span class="spinner is-active"></span></div></div>';
         html += '<div class="cmw-section"><h3 class="cmw-h3">' + esc(S.whatToSync) + '</h3><div class="cmw-chips" id="cmw-chips"></div><p class="cmw-muted" id="cmw-chip-summary"></p></div>';
         html += '<div class="cmw-section cmw-switch-row"><label class="cmw-switch"><input type="checkbox" id="cmw-auto-sync"' + (C.autoSync ? ' checked' : '') + '><span class="cmw-switch-ui" aria-hidden="true"></span><span class="cmw-switch-text"><strong>' + esc(S.autoSync) + '</strong><span>' + esc(S.autoSyncHelp) + '</span></span></label></div>';
@@ -745,6 +748,7 @@
             $toggle.prop('hidden', true);
         } else if (sync.done) {
             html = '<div class="cmw-sync-title is-ok"><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span> ' + esc(fmt(S.syncDone, sync.total || total)) + '</div>';
+            html += '<p class="cmw-muted"><strong>' + esc(S.readStatus) + ':</strong> <span id="cmw-sync-read"><span class="spinner is-active"></span></span></p>';
             $toggle.prop('hidden', false).text(S.syncNow);
         } else if (sync.running || sync.paused || sync.synced) {
             var title = fmt(sync.paused ? S.pausedOf : S.syncingOf, sync.synced, total);
@@ -770,6 +774,9 @@
         }
         $('#cmw-sync').html(html);
         $toggle.toggleClass('button-primary', !sync.running && !sync.done);
+        if (sync.done) {
+            loadReadStatus($('#cmw-sync-read'));
+        }
     }
 
     function startSync() {
@@ -1480,7 +1487,11 @@
         $('#cmw-header-actions').html('<a class="button" href="' + esc(C.site.url) + '" target="_blank" rel="noopener noreferrer">' + esc(S.viewSite) + '</a> <a class="button button-primary" href="' + esc(safeUrl(C.dashboardUrl)) + '" target="_blank" rel="noopener noreferrer">' + esc(S.openDashboard) + ' <span class="dashicons dashicons-external" aria-hidden="true"></span></a>');
 
         var edit = function (step) { return C.homeUrl + '&edit=' + step; };
-        var html = '<div id="cmw-home-banner"></div><div class="cmw-home-grid">';
+        var html = '<div id="cmw-home-banner"></div>';
+        if (C.site.isLocal) {
+            html += '<div class="cmw-inline-warning">' + esc(fmt(S.localSite, C.site.host)) + '</div>';
+        }
+        html += '<div class="cmw-home-grid">';
 
         // Connection
         html += card('admin-links', S.connection, '<span class="cmw-pill cmw-pill-ok">' + esc(S.connected) + '</span>',
@@ -1500,6 +1511,7 @@
         var last = (C.recentSync || [])[0];
         html += card('book', S.knowledgeSync, '<span class="cmw-pill' + (synced ? ' cmw-pill-ok' : '') + '">' + esc(synced ? S.upToDate : S.notSynced) + '</span>',
             row(S.source, '<span id="cmw-home-ks">' + esc(C.knowledgeAlias) + '</span>') +
+            row(S.readStatus, '<span id="cmw-home-read"><span class="spinner is-active"></span></span>') +
             row(S.syncing, typesLabel.join(' · ')) +
             row(S.autoSync, '<label class="cmw-switch cmw-switch-inline"><input type="checkbox" id="cmw-home-auto"' + (C.autoSync ? ' checked' : '') + '><span class="cmw-switch-ui" aria-hidden="true"></span><span>' + esc(C.autoSync ? S.on : S.off) + '</span></label>') +
             (last ? row(S.lastChange, esc(last.date) + ': ' + esc(last.title) + ' (' + esc(last.type) + ')') : ''),
@@ -1536,6 +1548,7 @@
 
         loadHomeBot();
         loadHomeKnowledgeName();
+        loadReadStatus($('#cmw-home-read'));
 
         $('#cmw-home-auto').on('change', function () {
             C.autoSync = $(this).is(':checked');
@@ -1632,6 +1645,41 @@
             }
         }).fail(function (error) {
             $('#cmw-home-bot').html('<p class="cmw-inline-error">' + esc(error.message) + '</p>');
+        });
+    }
+
+    // ChatMaxima reads synced pages in the background; a page it could not fetch stays unread, with a reason
+    function loadReadStatus($target) {
+        if (!C.knowledgeAlias || !$target.length) {
+            return;
+        }
+        post('chatmaxima_wiz_training_status').done(function (data) {
+            var total = data.total || 0;
+            var indexed = data.indexed || 0;
+            var html;
+            if (!total) {
+                html = esc(S.readPending);
+            } else if (!indexed) {
+                html = '<span class="cmw-err">' + esc(S.readNone) + '</span>';
+                if (data.reason) {
+                    html += ' <span class="cmw-muted">' + esc(data.reason) + '</span>';
+                } else {
+                    html += ' <span class="cmw-muted">' + esc(S.readPending) + '</span>';
+                }
+            } else {
+                html = esc(fmt(S.readByChatMaxima, indexed, total));
+                if (indexed < total && data.reason) {
+                    html += ' <span class="cmw-muted">' + esc(data.reason) + '</span>';
+                }
+            }
+            html += ' <button type="button" class="cmw-link-btn cmw-read-refresh">' + esc(S.refresh) + '</button>';
+            $target.html(html);
+            $target.find('.cmw-read-refresh').on('click', function () {
+                $target.html('<span class="spinner is-active"></span>');
+                loadReadStatus($target);
+            });
+        }).fail(function (error) {
+            $target.text(error.message);
         });
     }
 

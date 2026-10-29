@@ -46,7 +46,8 @@ class ChatMaxima_Setup_Wizard
             'chatmaxima_wiz_finish' => 'ajax_finish',
             'chatmaxima_wiz_reset' => 'ajax_reset',
             'chatmaxima_wiz_verify_signup' => 'ajax_verify_signup',
-            'chatmaxima_wiz_resend_code' => 'ajax_resend_code'
+            'chatmaxima_wiz_resend_code' => 'ajax_resend_code',
+            'chatmaxima_wiz_training_status' => 'ajax_training_status'
         ];
         foreach ($ajax_actions as $action => $method)
         {
@@ -135,6 +136,7 @@ class ChatMaxima_Setup_Wizard
         }
 
         $site_host = wp_parse_url(home_url('/'), PHP_URL_HOST);
+        $site_is_local = $this->is_local_host($site_host); // ChatMaxima reads pages from the internet, so a local site can never be indexed
 
         wp_localize_script('chatmaxima-setup', 'chatmaximaSetup', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -155,6 +157,7 @@ class ChatMaxima_Setup_Wizard
                 'name' => get_bloginfo('name'),
                 'url' => home_url('/'),
                 'host' => $site_host,
+                'isLocal' => $site_is_local,
                 'iconUrl' => get_site_icon_url(96)
             ],
             'knowledgeAlias' => get_option('chatmaxima_knowledge_source_alias', ''),
@@ -169,6 +172,28 @@ class ChatMaxima_Setup_Wizard
             'isSsl' => is_ssl(), // passwords and provider keys go browser -> this site; warn when that hop is plain http
             'strings' => $this->get_strings()
         ]);
+    }
+
+    /**
+     * A host ChatMaxima cannot reach from the internet: localhost, a bare name, a private or loopback address, or a
+     * development TLD. Pages on such a site are accepted by the sync but can never be read, so the plugin says so.
+     */
+    private function is_local_host($host)
+    {
+        $host = strtolower(trim((string) $host, '[]'));
+        if ($host === '' || $host === 'localhost' || strpos($host, '.') === false)
+        {
+            return true;
+        }
+        if (preg_match('/\.(local|localhost|test|internal|lan|home|localdomain)$/', $host))
+        {
+            return true;
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP) && !filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE))
+        {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -368,6 +393,49 @@ class ChatMaxima_Setup_Wizard
             $this->send_wp_error($result);
         }
         wp_send_json_success([]);
+    }
+
+    /**
+     * How many synced pages ChatMaxima has read into the knowledge source, and why the others were not
+     */
+    public function ajax_training_status()
+    {
+        $this->guard();
+        $alias = get_option('chatmaxima_knowledge_source_alias', '');
+        if ($alias === '')
+        {
+            wp_send_json_success(['total' => 0, 'indexed' => 0, 'reason' => '']);
+        }
+        $result = $this->api_client->get_training_content($alias);
+        if (is_wp_error($result))
+        {
+            $this->send_wp_error($result);
+        }
+        $items = [];
+        if (isset($result['training_content']) && is_array($result['training_content']))
+        {
+            $items = $result['training_content'];
+        }
+        $total = 0;
+        $indexed = 0;
+        $reason = '';
+        foreach ($items as $item)
+        {
+            if (!is_array($item))
+            {
+                continue;
+            }
+            $total++;
+            if (isset($item['index_status']) && $item['index_status'] === 'Y')
+            {
+                $indexed++;
+            }
+            else if ($reason === '' && !empty($item['index_status_reason']))
+            {
+                $reason = sanitize_text_field((string) $item['index_status_reason']);
+            }
+        }
+        wp_send_json_success(['total' => $total, 'indexed' => $indexed, 'reason' => $reason]);
     }
 
     /**
@@ -871,6 +939,14 @@ class ChatMaxima_Setup_Wizard
             'emailTaken' => __('This email already has a ChatMaxima account.', 'chatmaxima-ai-chatbot'),
             'signInInstead' => __('Sign in instead', 'chatmaxima-ai-chatbot'),
             'fillAll' => __('Please fill in every field.', 'chatmaxima-ai-chatbot'),
+            /* translators: %s: site host name */
+            'localSite' => __('This site (%s) is not reachable from the internet, so ChatMaxima cannot read its pages and the chatbot will have nothing to answer from. Finish setup here to try it out, then run it on your public site.', 'chatmaxima-ai-chatbot'),
+            /* translators: 1: pages ChatMaxima indexed, 2: pages synced */
+            'readByChatMaxima' => __('ChatMaxima has read %1$s of %2$s synced pages.', 'chatmaxima-ai-chatbot'),
+            'readNone' => __('ChatMaxima could not read any of the synced pages yet.', 'chatmaxima-ai-chatbot'),
+            'readPending' => __('Pages are read a few minutes after they are synced.', 'chatmaxima-ai-chatbot'),
+            'readStatus' => __('Read by ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'refresh' => __('Refresh', 'chatmaxima-ai-chatbot'),
             /* translators: %s: email address */
             'signedInAs' => __('Signed in as %s.', 'chatmaxima-ai-chatbot'),
             'signOut' => __('Sign out', 'chatmaxima-ai-chatbot'),
