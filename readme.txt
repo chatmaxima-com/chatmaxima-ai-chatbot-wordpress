@@ -123,11 +123,13 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 == Screenshots ==
 
 1. Setup, step 1: sign in to ChatMaxima or create a free account
-2. Setup, step 2: choose the content to sync and watch it run
+2. Setup, step 2: choose the content to sync, run the sync and see what ChatMaxima has read
 3. Setup, step 3: name the chatbot, pick its role and tone, and try sample questions
-4. Post meta box showing sync status
-5. Bulk action for syncing multiple posts
-6. Home: connection, knowledge, chatbot and widget at a glance
+4. Setup, step 3: use MaxIA V4 (included) or your own OpenAI, Anthropic, Google or Groq key
+5. Setup, step 4: preview the real chat widget in the admin, then switch it on for visitors
+6. Home: connection, knowledge, chatbot and widget at a glance, each editable in place
+7. Post editor box showing sync status, with an exclude option
+8. Bulk action for syncing selected posts
 
 == Changelog ==
 
