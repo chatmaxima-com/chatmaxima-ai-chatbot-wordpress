@@ -158,6 +158,8 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => __('Email and password are required', 'chatmaxima-ai-chatbot')]);
         }
 
+        $previous_email = $this->stored_account_email(); // read before the sign-in replaces it
+
         $result = $this->api_client->login($email, $password);
 
         if (is_wp_error($result))
@@ -165,7 +167,7 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => $result->get_error_message(), 'code' => $result->get_error_code()]);
         }
 
-        $this->wizard->reconcile_account(); // same account as before: keep the setup; another account: start fresh
+        $this->wizard->reconcile_account($previous_email); // same account as before: keep the setup; another account: start fresh
 
         wp_send_json_success(['message' => __('Connected successfully', 'chatmaxima-ai-chatbot')]);
     }
@@ -220,9 +222,22 @@ class ChatMaxima_Admin_Settings
             wp_send_json_success(['verification_required' => true, 'email' => $email]);
         }
 
-        $this->wizard->reconcile_account();
+        $this->wizard->reconcile_account('', true); // a new account never owns an existing setup
 
         wp_send_json_success(['message' => __('Account created and connected', 'chatmaxima-ai-chatbot')]);
+    }
+
+    /**
+     * The email of the ChatMaxima account currently stored, kept even after a session expires
+     */
+    private function stored_account_email()
+    {
+        $user_info = get_option('chatmaxima_user_info', []);
+        if (is_array($user_info) && !empty($user_info['email']))
+        {
+            return (string) $user_info['email'];
+        }
+        return '';
     }
 
     /**
@@ -347,8 +362,8 @@ class ChatMaxima_Admin_Settings
             'has_password' => false,
             'posts_per_page' => $batch_size,
             'offset' => $offset,
-            'orderby' => 'ID',
-            'order' => 'ASC',
+            'orderby' => ['date' => 'DESC', 'ID' => 'DESC'], // newest first: on the Free plan the page cap keeps the most recent posts
+            'order' => 'DESC',
             'meta_query' => [ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- the exclude flag is per post
                 'relation' => 'OR',
                 ['key' => '_chatmaxima_exclude_sync', 'compare' => 'NOT EXISTS'],
@@ -380,6 +395,16 @@ class ChatMaxima_Admin_Settings
         // Send to API
         $result = $this->api_client->add_training_urls($knowledge_source_alias, $urls);
 
+        if (is_wp_error($result) && $result->get_error_code() === 'PLAN_PAGE_LIMIT') // the Free plan's page cap was already full
+        {
+            ChatMaxima_Content_Sync::record_plan_limit($result->get_error_data());
+            foreach ($posts as $post)
+            {
+                ChatMaxima_Content_Sync::mark_limited($post->ID);
+            }
+            $this->send_limit_reached($offset, $total);
+        }
+
         if (is_wp_error($result))
         {
             $error_msg = $result->get_error_message();
@@ -397,13 +422,33 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => $error_msg]);
         }
 
+        ChatMaxima_Content_Sync::record_plan_limit($result['plan_limit'] ?? null);
+        $skipped_urls = [];
+        if (is_array($result) && !empty($result['skipped_urls']))
+        {
+            $skipped_urls = (array) $result['skipped_urls'];
+        }
+
         $sync_date = current_time('mysql');
+        $accepted_posts = [];
         foreach ($posts as $post)
         {
+            if (in_array(get_permalink($post->ID), $skipped_urls, true)) // did not fit in the Free plan's page cap
+            {
+                ChatMaxima_Content_Sync::mark_limited($post->ID);
+                continue;
+            }
             // Record each post as synced, as a single or bulk-action sync does, so the Posts column and meta box agree
             update_post_meta($post->ID, '_chatmaxima_sync_status', 'synced');
             update_post_meta($post->ID, '_chatmaxima_sync_date', $sync_date);
             delete_post_meta($post->ID, '_chatmaxima_sync_error');
+            $accepted_posts[] = $post;
+        }
+        $posts = $accepted_posts;
+
+        if (count($skipped_urls) > 0)
+        {
+            $this->send_limit_reached($offset + count($posts), $total);
         }
 
         $synced = $offset + count($posts);
@@ -428,6 +473,26 @@ class ChatMaxima_Admin_Settings
             'total' => $total,
             'next_offset' => $synced,
             'items' => $items
+        ]);
+    }
+
+    /**
+     * End a full sync at the Free plan's page cap: the newest posts are in, the rest need a higher plan
+     */
+    private function send_limit_reached($synced, $total)
+    {
+        $limit = ChatMaxima_Content_Sync::plan_limit_value();
+        update_option('chatmaxima_last_full_sync', ['date' => current_time('mysql'), 'synced' => $synced, 'total' => $total, 'limit_reached' => true], false);
+        wp_send_json_success([
+            'complete' => true,
+            'limit_reached' => true,
+            'limit' => $limit,
+            'upgrade_url' => ChatMaxima_Content_Sync::upgrade_url(),
+            /* translators: 1: number of pages the Free plan keeps, 2: number of posts and pages on the site */
+            'message' => sprintf(__('Your %1$d most recent posts and pages are synced. The ChatMaxima Free plan keeps up to %1$d, so the other %2$d were not synced. Upgrade your plan to sync them all.', 'chatmaxima-ai-chatbot'), $limit, max(0, $total - $synced)),
+            'synced' => $synced,
+            'total' => $total,
+            'items' => []
         ]);
     }
 

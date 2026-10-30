@@ -426,8 +426,22 @@ class ChatMaxima_API_Client
             return $response['data'];
         }
 
-        $error_message = isset($response['error']['message']) ? $response['error']['message'] : 'Failed to add training URLs';
-        return new WP_Error('add_training_failed', $error_message);
+        $error_message = 'Failed to add training URLs';
+        $error_code = 'add_training_failed';
+        $error_data = null;
+        if (isset($response['error']['message']))
+        {
+            $error_message = $response['error']['message'];
+        }
+        if (isset($response['error']['code']))
+        {
+            $error_code = $response['error']['code']; // PLAN_PAGE_LIMIT: the Free plan's page cap is reached
+        }
+        if (isset($response['error']['details']))
+        {
+            $error_data = $response['error']['details']; // limit, used, upgrade_url
+        }
+        return new WP_Error($error_code, $error_message, $error_data);
     }
 
     /**

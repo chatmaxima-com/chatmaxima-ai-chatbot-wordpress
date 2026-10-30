@@ -361,7 +361,8 @@
     padding: 8px 10px;
 }
 
-.cmw-wrap input.has-error {
+.cmw-wrap input.has-error,
+.cmw-wrap textarea.has-error {
     border-color: var(--cmw-err);
     box-shadow: 0 0 0 1px var(--cmw-err);
 }
@@ -1089,6 +1090,32 @@
 .cmw-pill-ok {
     background: var(--cmw-ok-soft);
     color: var(--cmw-ok-ink);
+}
+
+.cmw-pill-warn {
+    background: var(--cmw-warn-soft);
+    color: #8a6100;
+}
+
+.cmw-limit-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid #f0c33c;
+    border-radius: 6px;
+    background: var(--cmw-warn-soft);
+    color: #3c434a;
+}
+
+.cmw-limit-note .dashicons {
+    color: #dba617;
+}
+
+.cmw-limit-note span:not(.dashicons) {
+    flex: 1 1 260px;
 }
 
 .cmw-summary {

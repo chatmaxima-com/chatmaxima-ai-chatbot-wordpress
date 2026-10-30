@@ -199,10 +199,26 @@ class ChatMaxima_Content_Sync
 
         if (is_wp_error($result))
         {
+            if ($result->get_error_code() === 'PLAN_PAGE_LIMIT')
+            {
+                self::record_plan_limit($result->get_error_data());
+                self::mark_limited($post_id);
+                return false;
+            }
             // Record the error on the post (shown in the meta box)
             update_post_meta($post_id, '_chatmaxima_sync_status', 'error');
             update_post_meta($post_id, '_chatmaxima_sync_error', $result->get_error_message());
             return false;
+        }
+
+        if (is_array($result))
+        {
+            self::record_plan_limit($result['plan_limit'] ?? null);
+            if (!empty($result['skipped_urls']) && in_array($url, (array) $result['skipped_urls'], true))
+            {
+                self::mark_limited($post_id);
+                return false;
+            }
         }
 
         // Update sync status
@@ -211,6 +227,71 @@ class ChatMaxima_Content_Sync
         delete_post_meta($post_id, '_chatmaxima_sync_error');
 
         return true;
+    }
+
+    /**
+     * Remember the workspace's page cap from the last API answer (null: no cap), for Home, the meta box and notices
+     */
+    public static function record_plan_limit($plan_limit)
+    {
+        if (is_array($plan_limit) && isset($plan_limit['limit']))
+        {
+            update_option('chatmaxima_plan_limit', [
+                'limit' => absint($plan_limit['limit']),
+                'used' => absint($plan_limit['used'] ?? 0),
+                'reached' => !empty($plan_limit['reached']),
+                'upgrade_url' => esc_url_raw((string) ($plan_limit['upgrade_url'] ?? ''))
+            ], false);
+        }
+        else
+        {
+            delete_option('chatmaxima_plan_limit');
+        }
+    }
+
+    /**
+     * A post that did not fit in the Free plan's page cap
+     */
+    public static function mark_limited($post_id)
+    {
+        update_post_meta($post_id, '_chatmaxima_sync_status', 'limited');
+        update_post_meta($post_id, '_chatmaxima_sync_error', self::limit_message());
+    }
+
+    /**
+     * What to tell the user when the cap is reached
+     */
+    public static function limit_message()
+    {
+        $limit = self::plan_limit_value();
+        /* translators: %d: number of pages the Free plan keeps */
+        return sprintf(__('Not synced: the ChatMaxima Free plan keeps your %d most recent posts and pages. Upgrade your plan to sync more.', 'chatmaxima-ai-chatbot'), $limit);
+    }
+
+    /**
+     * The cap itself, 100 unless the API said otherwise
+     */
+    public static function plan_limit_value()
+    {
+        $plan_limit = get_option('chatmaxima_plan_limit', []);
+        if (is_array($plan_limit) && !empty($plan_limit['limit']))
+        {
+            return absint($plan_limit['limit']);
+        }
+        return 100;
+    }
+
+    /**
+     * Where to upgrade
+     */
+    public static function upgrade_url()
+    {
+        $plan_limit = get_option('chatmaxima_plan_limit', []);
+        if (is_array($plan_limit) && !empty($plan_limit['upgrade_url']))
+        {
+            return $plan_limit['upgrade_url'];
+        }
+        return 'https://chatmaxima.com/dashboard/plans/';
     }
 
     /**
@@ -260,6 +341,10 @@ class ChatMaxima_Content_Sync
                     <?php if ($sync_date): ?>
                         <br><small><?php echo esc_html($sync_date); ?></small>
                     <?php endif; ?>
+                <?php elseif ($sync_status === 'limited'): ?>
+                    <span class="status-error"><?php esc_html_e('Not synced, plan limit', 'chatmaxima-ai-chatbot'); ?></span>
+                    <br><small class="error-message"><?php echo esc_html(self::limit_message()); ?></small>
+                    <br><a href="<?php echo esc_url(self::upgrade_url()); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Upgrade plan', 'chatmaxima-ai-chatbot'); ?></a>
                 <?php elseif ($sync_status === 'error'): ?>
                     <span class="status-error"><?php esc_html_e('Error', 'chatmaxima-ai-chatbot'); ?></span>
                     <?php if ($sync_error): ?>
@@ -328,6 +413,7 @@ class ChatMaxima_Content_Sync
 
         $synced = 0;
         $failed = 0;
+        $limited = 0;
 
         foreach ($post_ids as $post_id)
         {
@@ -345,6 +431,10 @@ class ChatMaxima_Content_Sync
             {
                 $synced++;
             }
+            else if (get_post_meta($post_id, '_chatmaxima_sync_status', true) === 'limited')
+            {
+                $limited++;
+            }
             else
             {
                 $failed++;
@@ -353,7 +443,8 @@ class ChatMaxima_Content_Sync
 
         $redirect_to = add_query_arg([
             'chatmaxima_synced' => $synced,
-            'chatmaxima_failed' => $failed
+            'chatmaxima_failed' => $failed,
+            'chatmaxima_limited' => $limited
         ], $redirect_to);
 
         return $redirect_to;
@@ -371,8 +462,29 @@ class ChatMaxima_Content_Sync
             return;
         }
         // phpcs:disable WordPress.Security.NonceVerification.Recommended
-        if (!empty($_REQUEST['chatmaxima_synced']) || !empty($_REQUEST['chatmaxima_failed']))
+        if (!empty($_REQUEST['chatmaxima_synced']) || !empty($_REQUEST['chatmaxima_failed']) || !empty($_REQUEST['chatmaxima_limited']))
         {
+            $limited = isset($_REQUEST['chatmaxima_limited']) ? absint($_REQUEST['chatmaxima_limited']) : 0;
+            if ($limited > 0)
+            {
+                printf(
+                    '<div class="notice notice-warning is-dismissible"><p>%s <a href="%s" target="_blank" rel="noopener noreferrer">%s</a></p></div>',
+                    esc_html(sprintf(
+                        /* translators: 1: number of posts not synced, 2: number of pages the Free plan keeps */
+                        _n(
+                            '%1$d post was not synced: the ChatMaxima Free plan keeps up to %2$d posts and pages.',
+                            '%1$d posts were not synced: the ChatMaxima Free plan keeps up to %2$d posts and pages.',
+                            $limited,
+                            'chatmaxima-ai-chatbot'
+                        ),
+                        $limited,
+                        self::plan_limit_value()
+                    )),
+                    esc_url(self::upgrade_url()),
+                    esc_html__('Upgrade your plan to sync more.', 'chatmaxima-ai-chatbot')
+                );
+            }
+
             $synced = isset($_REQUEST['chatmaxima_synced']) ? absint($_REQUEST['chatmaxima_synced']) : 0;
             $failed = isset($_REQUEST['chatmaxima_failed']) ? absint($_REQUEST['chatmaxima_failed']) : 0;
 
@@ -446,6 +558,10 @@ class ChatMaxima_Content_Sync
         elseif ($sync_status === 'error')
         {
             echo '<span class="chatmaxima-column-error">' . esc_html__('Error', 'chatmaxima-ai-chatbot') . '</span>';
+        }
+        elseif ($sync_status === 'limited')
+        {
+            echo '<span class="chatmaxima-column-error" title="' . esc_attr(self::limit_message()) . '">' . esc_html__('Plan limit', 'chatmaxima-ai-chatbot') . '</span>';
         }
         else
         {

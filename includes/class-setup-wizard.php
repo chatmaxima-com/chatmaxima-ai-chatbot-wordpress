@@ -73,7 +73,8 @@ class ChatMaxima_Setup_Wizard
             'model_label' => '',
             'workspace_confirmed' => false,
             'completed_at' => '',
-            'team_alias' => ''
+            'team_alias' => '',
+            'account_email' => ''
         ], $state);
     }
 
@@ -87,8 +88,13 @@ class ChatMaxima_Setup_Wizard
     /**
      * After a sign-in: if it is the account the setup was done with, keep the setup and move back to its workspace;
      * if it is another account, the knowledge source, chatbot and channel belong to someone else, so start again.
+     *
+     * $previous_email is the account that was stored before this sign-in replaced it. It covers a session that ended on
+     * its own (a refresh token that expired or was revoked): no Sign out ran, so chatmaxima_last_account was never
+     * written, but the old account details are still stored. $new_account is true for a sign-up, which can never own
+     * an existing setup.
      */
-    public function reconcile_account()
+    public function reconcile_account($previous_email = '', $new_account = false)
     {
         $user_info = get_option('chatmaxima_user_info', []);
         $last = get_option('chatmaxima_last_account', []);
@@ -97,7 +103,33 @@ class ChatMaxima_Setup_Wizard
         {
             return;
         }
-        $same_account = is_array($last) && !empty($last['email']) && strtolower($last['email']) === strtolower($user_info['email']);
+
+        // Who the setup belongs to: recorded in the setup itself (2.1.5+), else the account that signed out, else the
+        // account that was stored before this sign-in
+        $owner_email = '';
+        if (!empty($state['account_email']))
+        {
+            $owner_email = $state['account_email'];
+        }
+        else if (is_array($last) && !empty($last['email']))
+        {
+            $owner_email = $last['email'];
+        }
+        else if ($previous_email !== '')
+        {
+            $owner_email = $previous_email;
+        }
+
+        $same_account = true; // no owner on record: keep the setup, the workspace check below still catches a stranger
+        if ($new_account)
+        {
+            $same_account = false;
+        }
+        else if ($owner_email !== '' && strtolower($owner_email) !== strtolower($user_info['email']))
+        {
+            $same_account = false;
+        }
+
         if ($same_account)
         {
             $setup_team = '';
@@ -105,11 +137,15 @@ class ChatMaxima_Setup_Wizard
             {
                 $setup_team = $state['team_alias'];
             }
-            else if (!empty($last['team_alias']))
+            else if (is_array($last) && !empty($last['team_alias']))
             {
                 $setup_team = $last['team_alias'];
             }
-            $current_team = isset($user_info['team_alias']) ? $user_info['team_alias'] : '';
+            $current_team = '';
+            if (isset($user_info['team_alias']))
+            {
+                $current_team = $user_info['team_alias'];
+            }
             if ($setup_team !== '' && $setup_team !== $current_team) // sign-in lands on the default workspace; the setup lives in another
             {
                 $switched = $this->api_client->switch_team($setup_team);
@@ -119,9 +155,17 @@ class ChatMaxima_Setup_Wizard
                 }
             }
         }
-        if (!$same_account)
+
+        if ($same_account)
         {
-            foreach (['chatmaxima_knowledge_source_alias', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_selected_team', 'chatmaxima_last_full_sync', self::STATE_OPTION] as $option)
+            if (get_option(self::STATE_OPTION, null) !== null)
+            {
+                self::save_state(['account_email' => $user_info['email']]); // record the owner so the next sign-in needs nothing else
+            }
+        }
+        else
+        {
+            foreach (['chatmaxima_knowledge_source_alias', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_selected_team', 'chatmaxima_last_full_sync', 'chatmaxima_plan_limit', self::STATE_OPTION] as $option)
             {
                 delete_option($option);
             }
@@ -213,6 +257,7 @@ class ChatMaxima_Setup_Wizard
             'selectedPostTypes' => array_values((array) get_option('chatmaxima_sync_post_types', ['post', 'page'])),
             'autoSync' => (bool) get_option('chatmaxima_auto_sync', false),
             'lastFullSync' => get_option('chatmaxima_last_full_sync', []),
+            'planLimit' => get_option('chatmaxima_plan_limit', null), // Free plan page cap from the last API answer, null when none
             'recentSync' => $this->get_recent_sync(),
             'dashboardUrl' => 'https://chatmaxima.com/dashboard/',
             'isSsl' => is_ssl(), // passwords and provider keys go browser -> this site; warn when that hop is plain http
@@ -422,6 +467,7 @@ class ChatMaxima_Setup_Wizard
         {
             $this->send_wp_error($result);
         }
+        $this->reconcile_account('', true); // a brand-new account: a setup left by another account starts again
         wp_send_json_success(['state' => self::save_state(['step' => 'knowledge'])]);
     }
 
@@ -481,7 +527,8 @@ class ChatMaxima_Setup_Wizard
                 $reason = sanitize_text_field((string) $item['index_status_reason']);
             }
         }
-        wp_send_json_success(['total' => $total, 'indexed' => $indexed, 'reason' => $reason]);
+        ChatMaxima_Content_Sync::record_plan_limit($result['plan_limit'] ?? null); // an upgrade clears it here
+        wp_send_json_success(['total' => $total, 'indexed' => $indexed, 'reason' => $reason, 'plan_limit' => get_option('chatmaxima_plan_limit', null)]);
     }
 
     /**
@@ -919,7 +966,20 @@ class ChatMaxima_Setup_Wizard
             $this->api_client->update_chatbot($state['bot_alias'], ['regenerate_prompt' => true]); // best effort: Home offers it again
         }
         $user_info = get_option('chatmaxima_user_info', []);
-        $state = self::save_state(['completed' => true, 'completed_at' => current_time('mysql'), 'step' => 'install', 'team_alias' => isset($user_info['team_alias']) ? $user_info['team_alias'] : '']);
+        $team_alias = '';
+        $account_email = '';
+        if (is_array($user_info))
+        {
+            if (isset($user_info['team_alias']))
+            {
+                $team_alias = $user_info['team_alias'];
+            }
+            if (isset($user_info['email']))
+            {
+                $account_email = $user_info['email'];
+            }
+        }
+        $state = self::save_state(['completed' => true, 'completed_at' => current_time('mysql'), 'step' => 'install', 'team_alias' => $team_alias, 'account_email' => $account_email]);
         wp_send_json_success(['state' => $state, 'homeUrl' => admin_url('admin.php?page=' . self::PAGE_SLUG)]);
     }
 
@@ -930,7 +990,7 @@ class ChatMaxima_Setup_Wizard
     {
         $this->guard(false);
         $this->api_client->clear_tokens();
-        foreach (['chatmaxima_user_info', 'chatmaxima_last_account', 'chatmaxima_knowledge_source_alias', 'chatmaxima_selected_team', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_last_full_sync', self::STATE_OPTION] as $option)
+        foreach (['chatmaxima_user_info', 'chatmaxima_last_account', 'chatmaxima_knowledge_source_alias', 'chatmaxima_selected_team', 'chatmaxima_channel_alias', 'chatmaxima_installed_channel', 'chatmaxima_last_full_sync', 'chatmaxima_plan_limit', self::STATE_OPTION] as $option)
         {
             delete_option($option);
         }
@@ -1098,6 +1158,14 @@ class ChatMaxima_Setup_Wizard
             'roleBooking' => __('Booking assistant', 'chatmaxima-ai-chatbot'),
             'roleBookingSub' => __('Helps visitors book or place orders', 'chatmaxima-ai-chatbot'),
             'roleOther' => __('Something else', 'chatmaxima-ai-chatbot'),
+            'roleCustom' => __('Custom assistant', 'chatmaxima-ai-chatbot'),
+            /* translators: 1: pages synced, 2: posts and pages on the site */
+            'syncLimited' => __('%1$s of %2$s synced, Free plan limit reached', 'chatmaxima-ai-chatbot'),
+            /* translators: %s: number of pages the Free plan keeps */
+            'planLimitNote' => __('The ChatMaxima Free plan keeps your %s most recent posts and pages. Upgrade your plan to sync all of your content.', 'chatmaxima-ai-chatbot'),
+            'planLimitPill' => __('Free plan limit', 'chatmaxima-ai-chatbot'),
+            'upgradePlan' => __('Upgrade plan', 'chatmaxima-ai-chatbot'),
+            'roleOtherRequired' => __('Describe what the chatbot should do, or pick one of the other options.', 'chatmaxima-ai-chatbot'),
             'roleOtherSub' => __('Describe it in your own words', 'chatmaxima-ai-chatbot'),
             'roleOtherPlaceholder' => __('What should the chatbot help visitors with?', 'chatmaxima-ai-chatbot'),
             'tone' => __('Tone', 'chatmaxima-ai-chatbot'),

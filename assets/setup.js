@@ -587,10 +587,13 @@
         html += footer(back, right);
         renderShell(html);
 
-        if (C.lastFullSync && C.lastFullSync.total && C.lastFullSync.synced >= C.lastFullSync.total && C.knowledgeAlias && !ui.sync.running) {
+        if (C.lastFullSync && C.lastFullSync.total && (C.lastFullSync.synced >= C.lastFullSync.total || C.lastFullSync.limit_reached) && C.knowledgeAlias && !ui.sync.running) {
             ui.sync.done = true;
             ui.sync.synced = C.lastFullSync.synced;
             ui.sync.total = C.lastFullSync.total;
+            if (C.lastFullSync.limit_reached && C.planLimit) {
+                ui.sync.limit = { limit: C.planLimit.limit, upgradeUrl: C.planLimit.upgrade_url };
+            }
         }
 
         renderChips();
@@ -742,6 +745,11 @@
         });
     }
 
+    function planLimitHtml(limit, upgradeUrl) {
+        return '<div class="cmw-limit-note"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span>' + esc(fmt(S.planLimitNote, limit || 100)) +
+            '</span> <a class="button button-small" href="' + esc(safeUrl(upgradeUrl || 'https://chatmaxima.com/dashboard/plans/')) + '" target="_blank" rel="noopener noreferrer">' + esc(S.upgradePlan) + '</a></div>';
+    }
+
     function renderSyncBox() {
         var sync = ui.sync;
         var total = sync.total || selectedCount();
@@ -754,6 +762,11 @@
         if (!selectedCount()) {
             html = '<p class="cmw-muted">' + esc(S.syncNothing) + '</p>';
             $toggle.prop('hidden', true);
+        } else if (sync.done && sync.limit) {
+            html = '<div class="cmw-sync-title"><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span> ' + esc(fmt(S.syncLimited, sync.synced, sync.total || total)) + '</div>';
+            html += planLimitHtml(sync.limit.limit, sync.limit.upgradeUrl);
+            html += '<p class="cmw-muted"><strong>' + esc(S.readStatus) + ':</strong> <span id="cmw-sync-read"><span class="spinner is-active"></span></span></p>';
+            $toggle.prop('hidden', false).text(S.syncNow);
         } else if (sync.done) {
             html = '<div class="cmw-sync-title is-ok"><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span> ' + esc(fmt(S.syncDone, sync.total || total)) + '</div>';
             html += '<p class="cmw-muted"><strong>' + esc(S.readStatus) + ':</strong> <span id="cmw-sync-read"><span class="spinner is-active"></span></span></p>';
@@ -797,6 +810,7 @@
                 ui.sync.synced = 0;
                 ui.sync.offset = 0;
                 ui.sync.items = [];
+                ui.sync.limit = null;
             }
             ui.sync.running = true;
             ui.sync.paused = false;
@@ -822,7 +836,11 @@
             if (data.complete) {
                 ui.sync.running = false;
                 ui.sync.done = true;
-                C.lastFullSync = { synced: ui.sync.synced, total: ui.sync.total };
+                ui.sync.limit = null;
+                if (data.limit_reached) {
+                    ui.sync.limit = { limit: data.limit, upgradeUrl: data.upgrade_url };
+                }
+                C.lastFullSync = { synced: ui.sync.synced, total: ui.sync.total, limit_reached: !!data.limit_reached };
                 renderChips();
                 renderSyncBox();
                 updateContinue();
@@ -846,7 +864,7 @@
         { key: 'support', purpose: 'answer_queries', title: 'roleSupport', sub: 'roleSupportSub' },
         { key: 'sales', purpose: 'sell_products', title: 'roleSales', sub: 'roleSalesSub' },
         { key: 'booking', purpose: 'book_appointments', title: 'roleBooking', sub: 'roleBookingSub' },
-        { key: 'other', purpose: 'answer_queries', title: 'roleOther', sub: 'roleOtherSub' }
+        { key: 'other', purpose: 'custom', title: 'roleOther', sub: 'roleOtherSub' }
     ];
 
     function personaFromBot() {
@@ -859,8 +877,8 @@
             role = 'sales';
         } else if (bot.purpose === 'book_appointments') {
             role = 'booking';
-        } else if (bot.business_description) {
-            role = 'other';
+        } else if (bot.purpose === 'custom' || bot.business_description) {
+            role = 'other'; // custom: the description is the bot's job; older bots kept it as answer_queries plus a description
         }
         var name = bot.name || 'Max';
         ui.persona = {
@@ -1037,6 +1055,13 @@
     }
 
     function savePersona($button) {
+        var p = readPersona();
+        if (p.role === 'other' && p.description === '') {
+            $('#cmw-role-other').addClass('has-error').trigger('focus');
+            notice(S.roleOtherRequired, 'error');
+            return $.Deferred().reject({ message: S.roleOtherRequired }).promise();
+        }
+        $('#cmw-role-other').removeClass('has-error');
         busy($button, ui.bot ? S.saving : S.writingPrompt);
         return post('chatmaxima_wiz_save_bot', personaPayload()).done(function (data) {
             ui.bot = data.bot;
@@ -1520,7 +1545,13 @@
         });
         var synced = C.lastFullSync && C.lastFullSync.total;
         var last = (C.recentSync || [])[0];
-        html += card('book', S.knowledgeSync, '<span class="cmw-pill' + (synced ? ' cmw-pill-ok' : '') + '">' + esc(synced ? S.upToDate : S.notSynced) + '</span>',
+        var limited = !!(C.planLimit && C.planLimit.reached);
+        var pill = '<span class="cmw-pill' + (synced ? ' cmw-pill-ok' : '') + '" id="cmw-home-ks-pill">' + esc(synced ? S.upToDate : S.notSynced) + '</span>';
+        if (limited) {
+            pill = '<span class="cmw-pill cmw-pill-warn" id="cmw-home-ks-pill">' + esc(S.planLimitPill) + '</span>';
+        }
+        html += card('book', S.knowledgeSync, pill,
+            '<div id="cmw-home-limit">' + (limited ? planLimitHtml(C.planLimit.limit, C.planLimit.upgrade_url) : '') + '</div>' +
             row(S.source, '<span id="cmw-home-ks">' + esc(C.knowledgeAlias) + '</span>') +
             row(S.readStatus, '<span id="cmw-home-read"><span class="spinner is-active"></span></span>') +
             row(S.syncing, typesLabel.join(' · ')) +
@@ -1625,6 +1656,8 @@
                 roleLabel = S.roleSales;
             } else if (bot.purpose === 'book_appointments') {
                 roleLabel = S.roleBooking;
+            } else if (bot.purpose === 'custom') {
+                roleLabel = S.roleCustom;
             }
             var toneKey = 'tone' + String(bot.tone || 'friendly').charAt(0).toUpperCase() + String(bot.tone || 'friendly').slice(1);
             var modelLabel = C.state.model_label || 'MaxIA V4';
@@ -1684,6 +1717,15 @@
             var total = data.total || 0;
             var indexed = data.indexed || 0;
             var html;
+            C.planLimit = data.plan_limit || null;
+            if ($('#cmw-home-limit').length) {
+                if (C.planLimit && C.planLimit.reached) {
+                    $('#cmw-home-limit').html(planLimitHtml(C.planLimit.limit, C.planLimit.upgrade_url));
+                    $('#cmw-home-ks-pill').attr('class', 'cmw-pill cmw-pill-warn').text(S.planLimitPill);
+                } else {
+                    $('#cmw-home-limit').empty(); // upgraded, or under the cap
+                }
+            }
             if (!total) {
                 html = esc(S.readPending);
             } else if (!indexed) {

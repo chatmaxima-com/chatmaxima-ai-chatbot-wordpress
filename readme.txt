@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.4
+Stable tag: 2.1.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,12 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.5 =
+* Fix: signing in again after the ChatMaxima session expired asked for the whole setup again. The plugin now remembers which account the setup belongs to, so the same account keeps its knowledge source, chatbot and channel; a different account still starts fresh.
+* Fix: the "Something else" choice for what the chatbot should do now becomes the chatbot's job, instead of being added as a note about the business.
+* The "Something else" box must be filled in before saving.
+* Free plan: ChatMaxima's Free plan keeps up to 100 posts and pages per knowledge source. The full sync now goes newest first, so your most recent content is kept, and stops at the limit with an Upgrade plan link. Posts that did not fit show "Plan limit" in the Posts list and in the editor.
+
 = 2.1.4 =
 * Fixed: the ChatMaxima mark in the page header did not load on sites installed from WordPress.org (the file was not in the plugin package)
 * The chatbot's instructions always follow the chosen role, tone and description, even before ChatMaxima has read your content; the AI-written version replaces them once it has (server-side change)
@@ -202,6 +208,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.5 =
+Signing in again keeps your setup; "Something else" now sets what the chatbot does; the Free plan syncs your 100 most recent posts and pages.
 
 = 2.1.4 =
 Fixes the missing header logo; role and tone changes now always apply to the chatbot.
