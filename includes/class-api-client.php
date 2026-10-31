@@ -398,8 +398,7 @@ class ChatMaxima_API_Client
             return $response['data'];
         }
 
-        $error_message = isset($response['error']['message']) ? $response['error']['message'] : 'Failed to create knowledge source';
-        return new WP_Error('create_failed', $error_message);
+        return $this->api_error($response, 'create_failed', 'Failed to create knowledge source'); // PLAN_KNOWLEDGE_SOURCE_LIMIT
     }
 
     /**
@@ -426,8 +425,17 @@ class ChatMaxima_API_Client
             return $response['data'];
         }
 
-        $error_message = 'Failed to add training URLs';
-        $error_code = 'add_training_failed';
+        return $this->api_error($response, 'add_training_failed', 'Failed to add training URLs'); // PLAN_PAGE_LIMIT, KNOWLEDGE_SOURCE_INACTIVE
+    }
+
+    /**
+     * Turn a ChatMaxima error reply into a WP_Error that keeps the server's code and details
+     * (PLAN_PAGE_LIMIT, PLAN_KNOWLEDGE_SOURCE_LIMIT, KNOWLEDGE_SOURCE_INACTIVE; details carry limit and upgrade_url)
+     */
+    private function api_error($response, $default_code, $default_message)
+    {
+        $error_message = $default_message;
+        $error_code = $default_code;
         $error_data = null;
         if (isset($response['error']['message']))
         {
@@ -435,11 +443,11 @@ class ChatMaxima_API_Client
         }
         if (isset($response['error']['code']))
         {
-            $error_code = $response['error']['code']; // PLAN_PAGE_LIMIT: the Free plan's page cap is reached
+            $error_code = $response['error']['code'];
         }
         if (isset($response['error']['details']))
         {
-            $error_data = $response['error']['details']; // limit, used, upgrade_url
+            $error_data = $response['error']['details'];
         }
         return new WP_Error($error_code, $error_message, $error_data);
     }
@@ -461,7 +469,7 @@ class ChatMaxima_API_Client
             return $response['data'];
         }
 
-        return new WP_Error('fetch_failed', 'Failed to fetch training content');
+        return $this->api_error($response, 'fetch_failed', 'Failed to fetch training content'); // KNOWLEDGE_SOURCE_INACTIVE, NOT_FOUND
     }
 
     /**

@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.5
+Stable tag: 2.1.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,11 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.6 =
+* Fix: a knowledge source deactivated in ChatMaxima still showed as connected, and posts kept syncing into it. Home now marks it Deactivated with a "Choose a knowledge source" button, the Knowledge step offers your active sources or a new one, and a sync stops with a clear message.
+* Fix: a chatbot deactivated in ChatMaxima kept answering visitors. It now stays silent everywhere (server-side change), and Home marks it Deactivated with a link to turn it back on.
+* Free plan: ChatMaxima's Free plan includes 1 active knowledge source. Creating a second one shows the limit with an Upgrade plan link and keeps your existing source selected.
+
 = 2.1.5 =
 * Fix: signing in again after the ChatMaxima session expired asked for the whole setup again. The plugin now remembers which account the setup belongs to, so the same account keeps its knowledge source, chatbot and channel; a different account still starts fresh.
 * Fix: the "Something else" choice for what the chatbot should do now becomes the chatbot's job, instead of being added as a note about the business.
@@ -208,6 +213,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.6 =
+Shows when the knowledge source or chatbot was deactivated in ChatMaxima, and the Free plan's one knowledge source limit.
 
 = 2.1.5 =
 Signing in again keeps your setup; "Something else" now sets what the chatbot does; the Free plan syncs your 100 most recent posts and pages.

@@ -18,7 +18,7 @@
         bot: null,
         botLoaded: false,
         chatbotTab: 'persona',
-        knowledge: { mode: 'new', sources: null, name: (C.site && C.site.name) || '' },
+        knowledge: { mode: 'new', sources: null, name: (C.site && C.site.name) || '', inactive: false, limitUrl: '' },
         sync: { running: false, paused: false, synced: 0, total: 0, items: [], error: '', done: false, offset: 0 },
         persona: null,
         model: { provider: 'chatmaxima', model: 'maxia-v4', credentialId: '', keyTested: false, models: [], keys: [] },
@@ -87,7 +87,7 @@
                 deferred.resolve(response.data || {});
             } else {
                 var error = (response && response.data) || {};
-                deferred.reject({ message: error.message || S.error, code: error.code || '' });
+                deferred.reject({ message: error.message || S.error, code: error.code || '', upgradeUrl: error.upgrade_url || '' });
             }
         }).fail(function (xhr, status, thrown) {
             console.error('ChatMaxima request failed:', action, status, thrown);
@@ -638,6 +638,16 @@
         post('chatmaxima_get_knowledge_sources').done(function (data) {
             ui.knowledge.sources = data.knowledge_sources || [];
             var selected = data.selected || C.knowledgeAlias;
+            ui.knowledge.inactive = !!data.selected_inactive;
+            if (ui.knowledge.inactive) {
+                // The stored source was deactivated in ChatMaxima: offer the active ones (or a new one) instead of syncing into it
+                selected = '';
+                ui.knowledge.mode = ui.knowledge.sources.length ? 'existing' : 'new';
+                ui.knowledge.selected = ui.knowledge.sources.length ? ui.knowledge.sources[0].alias : '';
+                ui.sync.done = false;
+                renderSyncBox();
+                updateContinue();
+            }
             if (selected) {
                 ui.knowledge.mode = 'existing';
                 ui.knowledge.selected = selected;
@@ -653,7 +663,14 @@
     function renderKsChoice() {
         var sources = ui.knowledge.sources || [];
         var isNew = ui.knowledge.mode === 'new';
-        var html = '<div class="cmw-ks-col"><label class="cmw-radio"><input type="radio" name="cmw-ks-mode" value="new"' + (isNew ? ' checked' : '') + '> ' + esc(S.createNewKs) + '</label>';
+        var html = '';
+        if (ui.knowledge.inactive) {
+            html += noteHtml(S.ksInactivePick);
+        }
+        if (ui.knowledge.limitUrl) {
+            html += noteHtml(S.ksLimit, ui.knowledge.limitUrl, S.upgradePlan, true);
+        }
+        html += '<div class="cmw-ks-col"><label class="cmw-radio"><input type="radio" name="cmw-ks-mode" value="new"' + (isNew ? ' checked' : '') + '> ' + esc(S.createNewKs) + '</label>';
         html += '<div class="cmw-field cmw-indent"><label for="cmw-ks-name">' + esc(S.name) + '</label><input id="cmw-ks-name" type="text" class="regular-text" value="' + esc(ui.knowledge.name) + '"' + (isNew ? '' : ' disabled') + '><p class="cmw-help">' + esc(S.nameFromSite) + '</p></div></div>';
         html += '<div class="cmw-ks-col"><label class="cmw-radio"><input type="radio" name="cmw-ks-mode" value="existing"' + (isNew ? '' : ' checked') + (sources.length ? '' : ' disabled') + '> ' + esc(S.useExistingKs) + '</label>';
         html += '<div class="cmw-indent"><select id="cmw-ks-select"' + (isNew || !sources.length ? ' disabled' : '') + '>';
@@ -693,6 +710,8 @@
             }
             post('chatmaxima_save_ks_selection', { alias: ui.knowledge.selected }).done(function () {
                 C.knowledgeAlias = ui.knowledge.selected;
+                ui.knowledge.inactive = false;
+                renderKsChoice();
                 deferred.resolve();
             }).fail(function (error) {
                 notice(error.message, 'error');
@@ -706,10 +725,23 @@
             ui.knowledge.mode = 'existing';
             ui.knowledge.selected = C.knowledgeAlias;
             ui.knowledge.sources = (ui.knowledge.sources || []).concat([{ alias: C.knowledgeAlias, name: name, document_count: 0 }]);
+            ui.knowledge.inactive = false;
+            ui.knowledge.limitUrl = '';
             renderKsChoice();
             deferred.resolve();
         }).fail(function (error) {
-            notice(error.message, 'error');
+            if (error.code === 'PLAN_KNOWLEDGE_SOURCE_LIMIT') {
+                // Free plan: one active source. Point at the existing one and the upgrade page
+                ui.knowledge.limitUrl = error.upgradeUrl || 'https://chatmaxima.com/dashboard/plans/';
+                if ((ui.knowledge.sources || []).length) {
+                    ui.knowledge.mode = 'existing';
+                    ui.knowledge.selected = ui.knowledge.sources[0].alias;
+                }
+                renderKsChoice();
+                updateContinue();
+            } else {
+                notice(error.message, 'error');
+            }
             deferred.reject();
         });
         return deferred.promise();
@@ -748,6 +780,19 @@
     function planLimitHtml(limit, upgradeUrl) {
         return '<div class="cmw-limit-note"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span>' + esc(fmt(S.planLimitNote, limit || 100)) +
             '</span> <a class="button button-small" href="' + esc(safeUrl(upgradeUrl || 'https://chatmaxima.com/dashboard/plans/')) + '" target="_blank" rel="noopener noreferrer">' + esc(S.upgradePlan) + '</a></div>';
+    }
+
+    // A warning line with an optional button, the same look as the plan limit note
+    function noteHtml(message, linkUrl, linkLabel, external) {
+        var html = '<div class="cmw-limit-note"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span>' + esc(message) + '</span>';
+        if (linkUrl) {
+            var href = linkUrl; // our own admin page
+            if (external) {
+                href = safeUrl(linkUrl); // a URL the ChatMaxima API sent back
+            }
+            html += ' <a class="button button-small" href="' + esc(href) + '"' + (external ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + esc(linkLabel) + '</a>';
+        }
+        return html + '</div>';
     }
 
     function renderSyncBox() {
@@ -855,6 +900,9 @@
             renderChips();
             renderSyncBox();
             updateContinue();
+            if (error.code === 'KNOWLEDGE_SOURCE_INACTIVE') {
+                loadKnowledgeSources(); // deactivated in ChatMaxima mid-sync: offer the active sources
+            }
         });
     }
 
@@ -1670,6 +1718,12 @@
                 row(S.name, '<strong>' + esc(bot.name) + '</strong> · ' + esc(roleLabel) + ' · ' + esc(S[toneKey] || bot.tone || '')) +
                 row(S.aiModel, esc(modelLabel) + ' <span class="cmw-muted">(' + esc(modelNote) + ')</span>') +
                 row(S.welcome, '"' + esc(welcome) + '"') + '</tbody></table>');
+            if (bot.status === 'inactive') {
+                // Deactivated in ChatMaxima: it answers on no channel, this site included
+                $('#cmw-home-bot').prepend(noteHtml(S.botInactive, bot.builder_url, S.openInChatMaxima, true));
+                $('#cmw-home-bot-pill').text(S.ksInactivePill).addClass('cmw-pill-warn');
+                return;
+            }
             $('#cmw-home-bot-pill').text(S.answering).addClass('cmw-pill-ok');
             if (bot.prompt_status === 'default') {
                 // Which message depends on whether ChatMaxima has read any page yet, and why not
@@ -1717,6 +1771,10 @@
             var total = data.total || 0;
             var indexed = data.indexed || 0;
             var html;
+            if (data.inactive) {
+                $target.text(S.ksInactiveRead); // loadHomeKnowledgeName shows the notice and the way out
+                return;
+            }
             C.planLimit = data.plan_limit || null;
             if ($('#cmw-home-limit').length) {
                 if (C.planLimit && C.planLimit.reached) {
@@ -1757,6 +1815,11 @@
             return;
         }
         post('chatmaxima_get_knowledge_sources').done(function (data) {
+            if (data.selected_inactive) {
+                $('#cmw-home-ks-pill').attr('class', 'cmw-pill cmw-pill-warn').text(S.ksInactivePill);
+                $('#cmw-home-limit').html(noteHtml(S.ksInactive, C.homeUrl + '&edit=knowledge', S.chooseKs, false));
+                return;
+            }
             $.each(data.knowledge_sources || [], function (i, source) {
                 if (source.alias === C.knowledgeAlias) {
                     $('#cmw-home-ks').html('<strong>' + esc(source.name) + '</strong> · ' + esc(fmt(S.nDocuments, source.document_count || 0)));

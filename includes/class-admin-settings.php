@@ -285,10 +285,24 @@ class ChatMaxima_Admin_Settings
         }
 
         $selected = get_option('chatmaxima_knowledge_source_alias', '');
+        $selected_inactive = false; // the list holds active sources only, so a stored source missing from it was deactivated (or removed) in ChatMaxima
+        if ($selected !== '')
+        {
+            $selected_inactive = true;
+            foreach ((array) $result['knowledge_sources'] as $source)
+            {
+                if (is_array($source) && isset($source['alias']) && $source['alias'] === $selected)
+                {
+                    $selected_inactive = false;
+                    break;
+                }
+            }
+        }
 
         wp_send_json_success([
             'knowledge_sources' => $result['knowledge_sources'],
-            'selected' => $selected
+            'selected' => $selected,
+            'selected_inactive' => $selected_inactive
         ]);
     }
 
@@ -316,7 +330,13 @@ class ChatMaxima_Admin_Settings
 
         if (is_wp_error($result))
         {
-            wp_send_json_error(['message' => $result->get_error_message()]);
+            $details = $result->get_error_data();
+            $upgrade_url = '';
+            if (is_array($details) && !empty($details['upgrade_url']))
+            {
+                $upgrade_url = esc_url_raw($details['upgrade_url']); // PLAN_KNOWLEDGE_SOURCE_LIMIT: the Free plan already holds its one active source
+            }
+            wp_send_json_error(['message' => $result->get_error_message(), 'code' => $result->get_error_code(), 'upgrade_url' => $upgrade_url]);
         }
 
         // Auto-select the newly created knowledge source
@@ -419,7 +439,7 @@ class ChatMaxima_Admin_Settings
             {
                 $error_msg .= sprintf(' (alias: %s)', $knowledge_source_alias);
             }
-            wp_send_json_error(['message' => $error_msg]);
+            wp_send_json_error(['message' => $error_msg, 'code' => $result->get_error_code()]); // KNOWLEDGE_SOURCE_INACTIVE: the Knowledge step asks for another source
         }
 
         ChatMaxima_Content_Sync::record_plan_limit($result['plan_limit'] ?? null);

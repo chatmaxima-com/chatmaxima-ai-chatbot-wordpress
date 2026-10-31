@@ -501,6 +501,10 @@ class ChatMaxima_Setup_Wizard
         $result = $this->api_client->get_training_content($alias);
         if (is_wp_error($result))
         {
+            if (in_array($result->get_error_code(), ['KNOWLEDGE_SOURCE_INACTIVE', 'NOT_FOUND'], true))
+            {
+                wp_send_json_success(['total' => 0, 'indexed' => 0, 'reason' => '', 'inactive' => true]); // Home shows the deactivated-source notice instead
+            }
             $this->send_wp_error($result);
         }
         $items = [];
@@ -1165,6 +1169,14 @@ class ChatMaxima_Setup_Wizard
             'planLimitNote' => __('The ChatMaxima Free plan keeps your %s most recent posts and pages. Upgrade your plan to sync all of your content.', 'chatmaxima-ai-chatbot'),
             'planLimitPill' => __('Free plan limit', 'chatmaxima-ai-chatbot'),
             'upgradePlan' => __('Upgrade plan', 'chatmaxima-ai-chatbot'),
+            'ksInactive' => __('This site\'s knowledge source was deactivated in ChatMaxima, so new posts are not synced to it. Activate it again in ChatMaxima, or choose another knowledge source.', 'chatmaxima-ai-chatbot'),
+            'ksInactivePick' => __('This site\'s knowledge source was deactivated in ChatMaxima. Choose another one below, or create a new one.', 'chatmaxima-ai-chatbot'),
+            'ksInactivePill' => __('Deactivated', 'chatmaxima-ai-chatbot'),
+            'ksInactiveRead' => __('Not available while the knowledge source is deactivated', 'chatmaxima-ai-chatbot'),
+            'chooseKs' => __('Choose a knowledge source', 'chatmaxima-ai-chatbot'),
+            'botInactive' => __('This chatbot is deactivated in ChatMaxima, so it does not answer visitors on this site or anywhere else. Activate it again in ChatMaxima to turn it back on.', 'chatmaxima-ai-chatbot'),
+            'openInChatMaxima' => __('Open in ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'ksLimit' => __('The ChatMaxima Free plan includes 1 active knowledge source. Use your existing one, or upgrade your plan to create more.', 'chatmaxima-ai-chatbot'),
             'roleOtherRequired' => __('Describe what the chatbot should do, or pick one of the other options.', 'chatmaxima-ai-chatbot'),
             'roleOtherSub' => __('Describe it in your own words', 'chatmaxima-ai-chatbot'),
             'roleOtherPlaceholder' => __('What should the chatbot help visitors with?', 'chatmaxima-ai-chatbot'),
