@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.6
+Stable tag: 2.1.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.7 =
+* A web channel switched off in ChatMaxima now shows on Home: the widget card says "Channel off" with a Change channel button, instead of Live. (The widget itself already stays hidden on your site while the channel is off.)
+
 = 2.1.6 =
 * Fix: a knowledge source deactivated in ChatMaxima still showed as connected, and posts kept syncing into it. Home now marks it Deactivated with a "Choose a knowledge source" button, the Knowledge step offers your active sources or a new one, and a sync stops with a clear message.
 * Fix: a chatbot deactivated in ChatMaxima kept answering visitors. It now stays silent everywhere (server-side change), and Home marks it Deactivated with a link to turn it back on.
@@ -213,6 +216,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.7 =
+Home shows when the site's web channel is switched off in ChatMaxima.
 
 = 2.1.6 =
 Shows when the knowledge source or chatbot was deactivated in ChatMaxima, and the Free plan's one knowledge source limit.

@@ -1614,6 +1614,7 @@
 
         // Widget
         html += card('desktop', S.websiteWidget, '<span class="cmw-pill' + (live ? ' cmw-pill-ok' : '') + '" id="cmw-home-live-pill">' + esc(live ? S.live : S.notLive) + '</span>',
+            '<div id="cmw-home-channel-note"></div>' +
             row(S.showOnSite, '<label class="cmw-switch cmw-switch-inline"><input type="checkbox" id="cmw-home-live"' + (live ? ' checked' : '') + (C.channelAlias || C.installedChannel ? '' : ' disabled') + '><span class="cmw-switch-ui" aria-hidden="true"></span><span id="cmw-home-live-text">' + esc(live ? S.onForAll : S.offForAll) + '</span></label>') +
             row(S.webChannel, esc(C.installedChannel || C.channelAlias)) +
             row(S.looks, '<a href="' + esc(safeUrl(C.dashboardUrl)) + '" target="_blank" rel="noopener noreferrer">' + esc(S.changeInChatMaxima) + '</a>'),
@@ -1637,6 +1638,7 @@
         $app.html(html);
 
         loadHomeBot();
+        loadHomeChannel();
         loadHomeKnowledgeName();
         loadReadStatus($('#cmw-home-read'));
         if (!C.user.teamName) {
@@ -1807,6 +1809,23 @@
             });
         }).fail(function (error) {
             $target.text(error.message);
+        });
+    }
+
+    // A web channel switched off in ChatMaxima hides the widget on the site; say so instead of Live
+    function loadHomeChannel() {
+        if (!C.installedChannel && !C.channelAlias) {
+            return;
+        }
+        post('chatmaxima_wiz_channel_status').done(function (data) {
+            if (data.active) {
+                return;
+            }
+            $('#cmw-home-channel-note').html(noteHtml(S.channelOff, C.homeUrl + '&edit=install', S.changeChannel, false));
+            $('#cmw-home-live-pill').attr('class', 'cmw-pill cmw-pill-warn').text(S.channelOffPill);
+            if (C.installedChannel) {
+                $('#cmw-subtitle').html('<span class="cmw-status-dot"></span>' + esc(fmt(S.homeChannelOff, C.state.bot_name || S.chatbot)));
+            }
         });
     }
 

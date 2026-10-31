@@ -47,7 +47,8 @@ class ChatMaxima_Setup_Wizard
             'chatmaxima_wiz_reset' => 'ajax_reset',
             'chatmaxima_wiz_verify_signup' => 'ajax_verify_signup',
             'chatmaxima_wiz_resend_code' => 'ajax_resend_code',
-            'chatmaxima_wiz_training_status' => 'ajax_training_status'
+            'chatmaxima_wiz_training_status' => 'ajax_training_status',
+            'chatmaxima_wiz_channel_status' => 'ajax_channel_status'
         ];
         foreach ($ajax_actions as $action => $method)
         {
@@ -533,6 +534,35 @@ class ChatMaxima_Setup_Wizard
         }
         ChatMaxima_Content_Sync::record_plan_limit($result['plan_limit'] ?? null); // an upgrade clears it here
         wp_send_json_success(['total' => $total, 'indexed' => $indexed, 'reason' => $reason, 'plan_limit' => get_option('chatmaxima_plan_limit', null)]);
+    }
+
+    /**
+     * Is this site's web channel still on in ChatMaxima? The channel API lists active channels only, so a channel
+     * switched off (or removed) in the dashboard answers NOT_FOUND. The widget script already hides itself then
+     * (the server answers account_is_inactive); this lets Home say so instead of showing Live.
+     */
+    public function ajax_channel_status()
+    {
+        $this->guard();
+        $alias = get_option('chatmaxima_installed_channel', '');
+        if ($alias === '')
+        {
+            $alias = get_option('chatmaxima_channel_alias', '');
+        }
+        if ($alias === '')
+        {
+            wp_send_json_success(['channel' => '', 'active' => false]);
+        }
+        $result = $this->api_client->get_channel($alias);
+        if (is_wp_error($result))
+        {
+            if ($result->get_error_code() === 'NOT_FOUND')
+            {
+                wp_send_json_success(['channel' => $alias, 'active' => false]);
+            }
+            $this->send_wp_error($result);
+        }
+        wp_send_json_success(['channel' => $alias, 'active' => true]);
     }
 
     /**
@@ -1176,6 +1206,9 @@ class ChatMaxima_Setup_Wizard
             'chooseKs' => __('Choose a knowledge source', 'chatmaxima-ai-chatbot'),
             'botInactive' => __('This chatbot is deactivated in ChatMaxima, so it does not answer visitors on this site or anywhere else. Activate it again in ChatMaxima to turn it back on.', 'chatmaxima-ai-chatbot'),
             'openInChatMaxima' => __('Open in ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'channelOff' => __('This web channel is switched off in ChatMaxima, so the chat widget does not show on your site. Turn it back on in ChatMaxima, or choose another channel.', 'chatmaxima-ai-chatbot'),
+            'channelOffPill' => __('Channel off', 'chatmaxima-ai-chatbot'),
+            'homeChannelOff' => __('%s is not showing on your site: its web channel is switched off in ChatMaxima.', 'chatmaxima-ai-chatbot'),
             'ksLimit' => __('The ChatMaxima Free plan includes 1 active knowledge source. Use your existing one, or upgrade your plan to create more.', 'chatmaxima-ai-chatbot'),
             'roleOtherRequired' => __('Describe what the chatbot should do, or pick one of the other options.', 'chatmaxima-ai-chatbot'),
             'roleOtherSub' => __('Describe it in your own words', 'chatmaxima-ai-chatbot'),

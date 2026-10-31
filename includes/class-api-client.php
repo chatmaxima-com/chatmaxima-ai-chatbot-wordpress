@@ -847,6 +847,6 @@ class ChatMaxima_API_Client
             return $response['data'];
         }
 
-        return new WP_Error('fetch_failed', 'Failed to fetch channel');
+        return $this->api_error($response, 'fetch_failed', 'Failed to fetch channel'); // NOT_FOUND: switched off or removed in ChatMaxima
     }
 }
