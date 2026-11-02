@@ -48,7 +48,9 @@ class ChatMaxima_Setup_Wizard
             'chatmaxima_wiz_verify_signup' => 'ajax_verify_signup',
             'chatmaxima_wiz_resend_code' => 'ajax_resend_code',
             'chatmaxima_wiz_training_status' => 'ajax_training_status',
-            'chatmaxima_wiz_channel_status' => 'ajax_channel_status'
+            'chatmaxima_wiz_channel_status' => 'ajax_channel_status',
+            'chatmaxima_wiz_list_bots' => 'ajax_list_bots',
+            'chatmaxima_wiz_select_bot' => 'ajax_select_bot'
         ];
         foreach ($ajax_actions as $action => $method)
         {
@@ -711,9 +713,9 @@ class ChatMaxima_Setup_Wizard
         }
         else
         {
-            if ($knowledge_alias !== '')
+            if ($knowledge_alias !== '' && $this->post_text('keep_knowledge') !== '1')
             {
-                $data['knowledge_source'] = $knowledge_alias; // follows a knowledge source changed on Home
+                $data['knowledge_source'] = $knowledge_alias; // follows a knowledge source changed on Home; skipped when the bot already uses it, so the others it answers from stay
             }
             $result = $this->api_client->update_chatbot($state['bot_alias'], $data);
             if (is_wp_error($result) && $result->get_error_code() === 'CHATBOT_NOT_FOUND') // deleted in ChatMaxima: build a new one
@@ -738,6 +740,74 @@ class ChatMaxima_Setup_Wizard
             'model_label' => $this->model_label(isset($result['model']) ? $result['model'] : null)
         ]);
         wp_send_json_success(['bot' => $result, 'state' => $state]);
+    }
+
+    /**
+     * The workspace's chatbots for "Use an existing chatbot"
+     */
+    public function ajax_list_bots()
+    {
+        $this->guard();
+        $result = $this->api_client->list_chatbots();
+        if (is_wp_error($result))
+        {
+            $this->send_wp_error($result);
+        }
+        $chatbots = [];
+        foreach ((array) ($result['chatbots'] ?? []) as $bot)
+        {
+            if (!is_array($bot) || empty($bot['bot_alias']))
+            {
+                continue;
+            }
+            $chatbots[] = [
+                'bot_alias' => sanitize_text_field((string) $bot['bot_alias']),
+                'name' => sanitize_text_field((string) ($bot['name'] ?? '')),
+                'kind' => sanitize_key((string) ($bot['kind'] ?? 'flow')),
+                'knowledge_sources' => array_map('sanitize_text_field', array_filter((array) ($bot['knowledge_sources'] ?? []), 'is_string'))
+            ];
+        }
+        wp_send_json_success(['chatbots' => $chatbots]);
+    }
+
+    /**
+     * Answer on this site with an existing chatbot (or clear the choice, to build a new one). With add_knowledge=1 the
+     * site's knowledge source is added to the bot next to its own; a bot built in ChatMaxima is otherwise left as it is.
+     */
+    public function ajax_select_bot()
+    {
+        $this->guard();
+        $bot_alias = $this->post_text('bot_alias');
+        if ($bot_alias === '')
+        {
+            $state = self::save_state(['bot_alias' => '', 'bot_name' => '', 'model_label' => '']);
+            wp_send_json_success(['bot' => null, 'state' => $state]);
+        }
+        $bot = $this->api_client->get_chatbot($bot_alias);
+        if (is_wp_error($bot))
+        {
+            $this->send_wp_error($bot);
+        }
+        $knowledge_alias = get_option('chatmaxima_knowledge_source_alias', '');
+        $kind = (string) ($bot['kind'] ?? 'flow');
+        if ($this->post_text('add_knowledge') === '1' && $knowledge_alias !== '' && in_array($kind, ['persona', 'ai'], true))
+        {
+            $bot = $this->api_client->add_bot_knowledge_source($bot_alias, $knowledge_alias);
+            if (is_wp_error($bot))
+            {
+                $this->send_wp_error($bot);
+            }
+        }
+        if (empty($bot['bot_alias']) || !isset($bot['name']))
+        {
+            wp_send_json_error(['message' => __('ChatMaxima returned an incomplete chatbot. Please try again.', 'chatmaxima-ai-chatbot')]);
+        }
+        $state = self::save_state([
+            'bot_alias' => sanitize_text_field((string) $bot['bot_alias']),
+            'bot_name' => sanitize_text_field((string) $bot['name']),
+            'model_label' => $this->model_label(isset($bot['model']) ? $bot['model'] : null)
+        ]);
+        wp_send_json_success(['bot' => $bot, 'state' => $state]);
     }
 
     public function ajax_get_bot()
@@ -1206,6 +1276,27 @@ class ChatMaxima_Setup_Wizard
             'chooseKs' => __('Choose a knowledge source', 'chatmaxima-ai-chatbot'),
             'botInactive' => __('This chatbot is deactivated in ChatMaxima, so it does not answer visitors on this site or anywhere else. Activate it again in ChatMaxima to turn it back on.', 'chatmaxima-ai-chatbot'),
             'openInChatMaxima' => __('Open in ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'loadingBots' => __('Loading your chatbots...', 'chatmaxima-ai-chatbot'),
+            'whichBot' => __('Which chatbot should answer on this site?', 'chatmaxima-ai-chatbot'),
+            'newBot' => __('Create a new chatbot', 'chatmaxima-ai-chatbot'),
+            'existingBot' => __('Use an existing chatbot', 'chatmaxima-ai-chatbot'),
+            'noExistingBots' => __('No chatbots in this workspace yet', 'chatmaxima-ai-chatbot'),
+            'useThisBot' => __('Use this chatbot', 'chatmaxima-ai-chatbot'),
+            'changeBot' => __('Change chatbot', 'chatmaxima-ai-chatbot'),
+            'answeringHere' => __('Answering on this site:', 'chatmaxima-ai-chatbot'),
+            'kindPersona' => __('Set up from WordPress', 'chatmaxima-ai-chatbot'),
+            'kindAi' => __('AI agent built in ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'kindFlow' => __('Flow built in ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'pickPersonaNote' => __('You can change its name, role, tone and AI model on the next screen.', 'chatmaxima-ai-chatbot'),
+            'botAiNote' => __('This chatbot was built in ChatMaxima. Its instructions and AI model stay as they are; change them in ChatMaxima.', 'chatmaxima-ai-chatbot'),
+            'botFlowNote' => __('This chatbot follows a flow built in ChatMaxima, so it answers with that flow, not from your posts and pages. Change it in ChatMaxima.', 'chatmaxima-ai-chatbot'),
+            'addSiteContent' => __('Also answer from this site\'s content (adds this site\'s knowledge source to the chatbot)', 'chatmaxima-ai-chatbot'),
+            'addSiteContentButton' => __('Add this site\'s content', 'chatmaxima-ai-chatbot'),
+            'usesSiteContent' => __('Answers from this site\'s content', 'chatmaxima-ai-chatbot'),
+            'noSiteContent' => __('Does not use this site\'s content yet', 'chatmaxima-ai-chatbot'),
+            'editInChatMaxima' => __('Edit in ChatMaxima', 'chatmaxima-ai-chatbot'),
+            'botType' => __('Type', 'chatmaxima-ai-chatbot'),
+            'siteContent' => __('Site content', 'chatmaxima-ai-chatbot'),
             'channelOff' => __('This web channel is switched off in ChatMaxima, so the chat widget does not show on your site. Turn it back on in ChatMaxima, or choose another channel.', 'chatmaxima-ai-chatbot'),
             'channelOffPill' => __('Channel off', 'chatmaxima-ai-chatbot'),
             'homeChannelOff' => __('%s is not showing on your site: its web channel is switched off in ChatMaxima.', 'chatmaxima-ai-chatbot'),

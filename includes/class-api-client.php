@@ -768,6 +768,22 @@ class ChatMaxima_API_Client
         return $this->api_call('chatbots/' . rawurlencode($bot_alias) . '/', 'GET');
     }
 
+    /**
+     * The workspace's chatbots, each with its kind: persona (editable here), ai or flow (built in ChatMaxima)
+     */
+    public function list_chatbots()
+    {
+        return $this->api_call('chatbots/', 'GET');
+    }
+
+    /**
+     * Add a knowledge source to a chatbot next to the ones it already uses; nothing else on the bot changes
+     */
+    public function add_bot_knowledge_source($bot_alias, $knowledge_alias)
+    {
+        return $this->api_call('chatbots/' . rawurlencode($bot_alias) . '/', 'POST', ['add_knowledge_source' => $knowledge_alias], 45);
+    }
+
     public function update_chatbot($bot_alias, $data)
     {
         return $this->api_call('chatbots/' . rawurlencode($bot_alias) . '/', 'POST', $data, 90);

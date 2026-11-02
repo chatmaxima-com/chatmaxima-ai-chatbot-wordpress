@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.7
+Stable tag: 2.1.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,10 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.8 =
+* New: use a chatbot you already have. The Chatbot step now asks which chatbot should answer on your site: create a new one, or pick one from your ChatMaxima workspace. Home has a Change chatbot button.
+* A chatbot built in ChatMaxima keeps its own instructions and AI model; the plugin can add your site's content to the knowledge it already uses, and links to ChatMaxima for everything else. A flow chatbot answers with its flow as it is.
+
 = 2.1.7 =
 * A web channel switched off in ChatMaxima now shows on Home: the widget card says "Channel off" with a Change channel button, instead of Live. (The widget itself already stays hidden on your site while the channel is off.)
 
@@ -216,6 +220,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.8 =
+Pick an existing chatbot from your ChatMaxima workspace instead of creating a new one.
 
 = 2.1.7 =
 Home shows when the site's web channel is switched off in ChatMaxima.

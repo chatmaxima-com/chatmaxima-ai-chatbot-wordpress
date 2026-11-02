@@ -17,6 +17,10 @@
         workspaceNeeded: false,
         bot: null,
         botLoaded: false,
+        botList: null, // the workspace's chatbots, for "Use an existing chatbot"
+        botPick: { mode: 'new', alias: '' },
+        botPickerOpen: false,
+        pendingNewBot: false, // "Create a new chatbot" chosen while another one answers here: cleared on the first save
         chatbotTab: 'persona',
         knowledge: { mode: 'new', sources: null, name: (C.site && C.site.name) || '', inactive: false, limitUrl: '' },
         sync: { running: false, paused: false, synced: 0, total: 0, items: [], error: '', done: false, offset: 0 },
@@ -915,11 +919,19 @@
         { key: 'other', purpose: 'custom', title: 'roleOther', sub: 'roleOtherSub' }
     ];
 
+    function bindChatbotBar(bot) {
+        $('#cmw-change-bot').on('click', function () {
+            ui.botPickerOpen = true;
+            ui.botPick = { mode: 'existing', alias: bot.bot_alias };
+            renderChatbot();
+        });
+    }
+
     function personaFromBot() {
         if (ui.persona) {
             return ui.persona;
         }
-        var bot = ui.bot || {};
+        var bot = activeBot() || {};
         var role = 'support';
         if (bot.purpose === 'sell_products') {
             role = 'sales';
@@ -948,15 +960,204 @@
         return ui.persona;
     }
 
+    function kindLabel(kind) {
+        if (kind === 'ai') {
+            return S.kindAi;
+        }
+        if (kind === 'flow') {
+            return S.kindFlow;
+        }
+        return S.kindPersona;
+    }
+
+    // Does the chatbot already answer from this site's knowledge source?
+    function botUsesSite(bot) {
+        return !!(bot && C.knowledgeAlias && (bot.knowledge_sources || []).indexOf(C.knowledgeAlias) !== -1);
+    }
+
+    // The chatbot that answers here, or null while a new one is being set up in its place
+    function activeBot() {
+        if (ui.pendingNewBot) {
+            return null;
+        }
+        return ui.bot;
+    }
+
+    function pickedBot() {
+        var found = null;
+        $.each(ui.botList || [], function (i, bot) {
+            if (bot.bot_alias === ui.botPick.alias) {
+                found = bot;
+            }
+        });
+        return found;
+    }
+
+    function chatbotBackHtml() {
+        if (C.editing) {
+            return '<a class="button" href="' + esc(C.homeUrl) + '">' + esc(S.backHome) + '</a>';
+        }
+        return '<button type="button" class="button" id="cmw-chatbot-back">' + esc(S.back) + '</button>';
+    }
+
+    // New chatbot, or one the workspace already has
+    function botPickerHtml() {
+        var list = ui.botList || [];
+        var isNew = ui.botPick.mode !== 'existing';
+        var html = '<div class="cmw-section"><h3 class="cmw-h3">' + esc(S.whichBot) + '</h3><div class="cmw-ks">';
+        html += '<div class="cmw-ks-col"><label class="cmw-radio"><input type="radio" name="cmw-bot-mode" value="new"' + (isNew ? ' checked' : '') + '> ' + esc(S.newBot) + '</label></div>';
+        html += '<div class="cmw-ks-col"><label class="cmw-radio"><input type="radio" name="cmw-bot-mode" value="existing"' + (isNew ? '' : ' checked') + (list.length ? '' : ' disabled') + '> ' + esc(S.existingBot) + '</label>';
+        html += '<div class="cmw-indent"><select id="cmw-bot-select"' + (isNew || !list.length ? ' disabled' : '') + '>';
+        if (!list.length) {
+            html += '<option value="">' + esc(S.noExistingBots) + '</option>';
+        }
+        $.each(list, function (i, bot) {
+            html += '<option value="' + esc(bot.bot_alias) + '"' + (bot.bot_alias === ui.botPick.alias ? ' selected' : '') + '>' + esc(bot.name) + ' · ' + esc(kindLabel(bot.kind)) + '</option>';
+        });
+        html += '</select></div></div></div></div>';
+        return html;
+    }
+
+    // What happens with the chatbot picked from the list
+    function pickedBotHtml() {
+        var bot = pickedBot();
+        if (!bot) {
+            return '';
+        }
+        var html = '<div class="cmw-section">';
+        if (bot.kind === 'persona') {
+            html += '<p class="cmw-muted">' + esc(S.pickPersonaNote) + '</p>';
+        } else if (bot.kind === 'ai') {
+            html += '<p class="cmw-muted">' + esc(S.botAiNote) + '</p>';
+        } else {
+            html += noteHtml(S.botFlowNote);
+        }
+        if (bot.kind !== 'flow' && C.knowledgeAlias && !botUsesSite(bot)) {
+            html += '<label class="cmw-radio"><input type="checkbox" id="cmw-add-site" checked> ' + esc(S.addSiteContent) + '</label>';
+        }
+        return html + '</div>';
+    }
+
+    // A chatbot built in ChatMaxima: used as it is; its prompt and model are edited there
+    function externalBotHtml(bot) {
+        var html = '<div class="cmw-section">';
+        if (bot.kind === 'ai') {
+            html += '<p>' + esc(S.botAiNote) + '</p>';
+            if (botUsesSite(bot)) {
+                html += '<p class="cmw-ok"><span class="dashicons dashicons-yes" aria-hidden="true"></span> ' + esc(S.usesSiteContent) + '</p>';
+            } else if (C.knowledgeAlias) {
+                html += '<p>' + esc(S.noSiteContent) + ' <button type="button" class="button" id="cmw-add-site-now">' + esc(S.addSiteContentButton) + '</button></p>';
+            }
+        } else {
+            html += noteHtml(S.botFlowNote);
+        }
+        if (bot.builder_url) {
+            html += '<p><a class="button" href="' + esc(safeUrl(bot.builder_url)) + '" target="_blank" rel="noopener noreferrer">' + esc(S.editInChatMaxima) + ' <span class="dashicons dashicons-external" aria-hidden="true"></span></a></p>';
+        }
+        return html + '</div>';
+    }
+
+    function selectBot(data, $button) {
+        if ($button) {
+            busy($button, S.saving);
+        }
+        return post('chatmaxima_wiz_select_bot', data).done(function (result) {
+            ui.bot = result.bot;
+            ui.botLoaded = true;
+            C.state = result.state;
+            ui.persona = null;
+            ui.pendingNewBot = false;
+            ui.botPickerOpen = false;
+            ui.chatbotTab = 'persona';
+            renderChatbot();
+        }).fail(function (error) {
+            if ($button) {
+                unbusy($button);
+            }
+            notice(error.message, 'error');
+        });
+    }
+
+    function bindBotPicker() {
+        $app.find('input[name="cmw-bot-mode"]').on('change', function () {
+            ui.botPick.mode = $(this).val();
+            if (ui.botPick.mode === 'existing' && !ui.botPick.alias && (ui.botList || []).length) {
+                ui.botPick.alias = ui.botList[0].bot_alias;
+            }
+            ui.pendingNewBot = ui.botPick.mode === 'new' && !!ui.bot; // a new chatbot in place of the one answering now
+            ui.persona = null;
+            ui.chatbotTab = 'persona';
+            renderChatbot();
+        });
+        $('#cmw-bot-select').on('change', function () {
+            ui.botPick.alias = $(this).val();
+            renderChatbot();
+        });
+        $('#cmw-chatbot-back').on('click', function () { go('knowledge'); });
+        $('#cmw-use-bot').on('click', function () {
+            selectBot({ bot_alias: ui.botPick.alias, add_knowledge: $('#cmw-add-site').is(':checked') ? '1' : '0' }, $(this));
+        });
+    }
+
     function renderChatbot() {
-        var p = personaFromBot();
         var html = '<h2 class="cmw-h">' + esc(S.chatbotTitle) + '</h2><p class="cmw-intro">' + esc(S.chatbotIntro) + '</p>';
-        html += '<div class="cmw-tabs" role="tablist"><button type="button" role="tab" class="cmw-tab' + (ui.chatbotTab === 'persona' ? ' is-active' : '') + '" data-tab="persona">' + esc(S.tabPersona) + (ui.bot && ui.chatbotTab === 'model' ? ' <span class="dashicons dashicons-yes" aria-hidden="true"></span>' : '') + '</button><button type="button" role="tab" class="cmw-tab' + (ui.chatbotTab === 'model' ? ' is-active' : '') + '" data-tab="model"' + (ui.bot ? '' : ' disabled') + '>' + esc(S.tabModel) + '</button></div>';
+        if (ui.botList === null) {
+            renderShell(html + '<p class="cmw-muted"><span class="spinner is-active"></span> ' + esc(S.loadingBots) + '</p>');
+            post('chatmaxima_wiz_list_bots').done(function (data) {
+                ui.botList = data.chatbots || [];
+            }).fail(function (error) {
+                ui.botList = [];
+                notice(error.message, 'error');
+            }).always(renderChatbot);
+            return;
+        }
+        var bot = activeBot();
+        if (!bot || ui.botPickerOpen) {
+            html += botPickerHtml();
+            if (ui.botPick.mode === 'existing') {
+                html += pickedBotHtml();
+                html += footer(chatbotBackHtml(), '<button type="button" class="button button-primary cmw-primary" id="cmw-use-bot"' + (ui.botPick.alias ? '' : ' disabled') + '>' + esc(S.useThisBot) + '</button>');
+                renderShell(html);
+                bindBotPicker();
+                return;
+            }
+        } else {
+            html += '<div class="cmw-limit-note"><span class="dashicons dashicons-format-chat" aria-hidden="true"></span><span>' + esc(S.answeringHere) + ' <strong>' + esc(bot.name) + '</strong> · ' + esc(kindLabel(bot.kind)) + '</span> <button type="button" class="button button-small" id="cmw-change-bot">' + esc(S.changeBot) + '</button></div>';
+            if (bot.kind && bot.kind !== 'persona') {
+                html += externalBotHtml(bot);
+                var externalBack = chatbotBackHtml();
+                if (C.editing) {
+                    externalBack = ''; // the primary button already goes Home
+                }
+                html += footer(externalBack, '<button type="button" class="button button-primary cmw-primary" id="cmw-external-next">' + esc(C.editing ? S.backHome : S.continueInstall) + '</button>');
+                renderShell(html);
+                bindChatbotBar(bot);
+                $('#cmw-chatbot-back').on('click', function () { go('knowledge'); });
+                $('#cmw-add-site-now').on('click', function () {
+                    selectBot({ bot_alias: bot.bot_alias, add_knowledge: '1' }, $(this));
+                });
+                $('#cmw-external-next').on('click', function () {
+                    if (C.editing) {
+                        window.location.href = C.homeUrl;
+                        return;
+                    }
+                    saveStep('install').always(function () { go('install'); });
+                });
+                return;
+            }
+        }
+        var p = personaFromBot();
+        var current = activeBot();
+        html += '<div class="cmw-tabs" role="tablist"><button type="button" role="tab" class="cmw-tab' + (ui.chatbotTab === 'persona' ? ' is-active' : '') + '" data-tab="persona">' + esc(S.tabPersona) + (current && ui.chatbotTab === 'model' ? ' <span class="dashicons dashicons-yes" aria-hidden="true"></span>' : '') + '</button><button type="button" role="tab" class="cmw-tab' + (ui.chatbotTab === 'model' ? ' is-active' : '') + '" data-tab="model"' + (current ? '' : ' disabled') + '>' + esc(S.tabModel) + '</button></div>';
         html += '<div id="cmw-tab-body"></div>';
         renderShell(html);
+        bindBotPicker();
+        if (bot && !ui.botPickerOpen) {
+            bindChatbotBar(bot);
+        }
         $app.find('.cmw-tab').on('click', function () {
             var tab = $(this).data('tab');
-            if (tab === 'model' && !ui.bot) {
+            if (tab === 'model' && !activeBot()) {
                 return;
             }
             readPersona();
@@ -1098,7 +1299,8 @@
             business_description: description,
             welcome_message: p.welcome,
             instructions: p.instructions,
-            avatar_url: p.avatarUrl || ''
+            avatar_url: p.avatarUrl || '',
+            keep_knowledge: botUsesSite(activeBot()) ? '1' : '' // the bot already answers from this site: keep its other sources
         };
     }
 
@@ -1110,8 +1312,16 @@
             return $.Deferred().reject({ message: S.roleOtherRequired }).promise();
         }
         $('#cmw-role-other').removeClass('has-error');
-        busy($button, ui.bot ? S.saving : S.writingPrompt);
-        return post('chatmaxima_wiz_save_bot', personaPayload()).done(function (data) {
+        busy($button, activeBot() ? S.saving : S.writingPrompt);
+        var start = $.Deferred().resolve().promise();
+        if (ui.pendingNewBot) {
+            start = post('chatmaxima_wiz_select_bot', { bot_alias: '' }).done(function () {
+                ui.bot = null;
+                ui.pendingNewBot = false;
+                ui.botPickerOpen = false;
+            });
+        }
+        return start.then(function () { return post('chatmaxima_wiz_save_bot', personaPayload()); }).done(function (data) {
             ui.bot = data.bot;
             ui.botLoaded = true;
             C.state = data.state;
@@ -1370,7 +1580,7 @@
         var m = ui.model;
         var finish = function () {
             busy($button, S.saving);
-            post('chatmaxima_wiz_save_bot', { provider: m.provider, model: m.model, credential_id: m.credentialId }).done(function (data) {
+            post('chatmaxima_wiz_save_bot', { provider: m.provider, model: m.model, credential_id: m.credentialId, keep_knowledge: botUsesSite(activeBot()) ? '1' : '' }).done(function (data) {
                 ui.bot = data.bot;
                 C.state = data.state;
                 if (C.editing) {
@@ -1715,6 +1925,26 @@
             var welcome = String(bot.welcome_message || '');
             if (welcome.length > 70) {
                 welcome = welcome.substring(0, 70) + '...';
+            }
+            if (bot.kind && bot.kind !== 'persona') {
+                // Built in ChatMaxima: no persona or model to edit here
+                var siteRow = '';
+                if (bot.kind === 'ai') {
+                    siteRow = row(S.siteContent, esc(botUsesSite(bot) ? S.usesSiteContent : S.noSiteContent));
+                }
+                $('#cmw-home-bot').html('<table class="cmw-rows"><tbody>' + row(S.name, '<strong>' + esc(bot.name) + '</strong>') + row(S.botType, esc(kindLabel(bot.kind))) + siteRow + '</tbody></table>');
+                var actions = '<a class="button" href="' + esc(C.homeUrl + '&edit=chatbot') + '">' + esc(S.changeBot) + '</a>';
+                if (bot.builder_url) {
+                    actions += '<a class="button" href="' + esc(safeUrl(bot.builder_url)) + '" target="_blank" rel="noopener noreferrer">' + esc(S.editInChatMaxima) + '</a>';
+                }
+                $('#cmw-home-bot').closest('.cmw-card').find('.cmw-card-actions').html(actions);
+                if (bot.status === 'inactive') {
+                    $('#cmw-home-bot').prepend(noteHtml(S.botInactive, bot.builder_url, S.openInChatMaxima, true));
+                    $('#cmw-home-bot-pill').text(S.ksInactivePill).addClass('cmw-pill-warn');
+                } else {
+                    $('#cmw-home-bot-pill').text(S.answering).addClass('cmw-pill-ok');
+                }
+                return;
             }
             $('#cmw-home-bot').html('<table class="cmw-rows"><tbody>' +
                 row(S.name, '<strong>' + esc(bot.name) + '</strong> · ' + esc(roleLabel) + ' · ' + esc(S[toneKey] || bot.tone || '')) +
