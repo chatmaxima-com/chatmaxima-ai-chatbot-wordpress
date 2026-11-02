@@ -23,7 +23,7 @@
         pendingNewBot: false, // "Create a new chatbot" chosen while another one answers here: cleared on the first save
         chatbotTab: 'persona',
         knowledge: { mode: 'new', sources: null, name: (C.site && C.site.name) || '', inactive: false, limitUrl: '' },
-        sync: { running: false, paused: false, synced: 0, total: 0, items: [], error: '', done: false, offset: 0 },
+        sync: { running: false, paused: false, synced: 0, total: 0, items: [], error: '', done: false, offset: 0, retries: 0, wait: 0, waitKind: '' },
         persona: null,
         model: { provider: 'chatmaxima', model: 'maxia-v4', credentialId: '', keyTested: false, models: [], keys: [] },
         channel: null,
@@ -836,6 +836,9 @@
             if (sync.error) {
                 html += '<div class="cmw-inline-error">' + esc(S.syncFailed) + ' ' + esc(sync.error) + '</div>';
             }
+            if (sync.running && sync.wait > 0) {
+                html += '<p class="cmw-muted" id="cmw-sync-wait">' + esc(syncWaitText()) + '</p>';
+            }
             html += '<p class="cmw-muted">' + esc(S.syncKeepOpen) + '</p>';
             $toggle.prop('hidden', false).text(sync.running ? S.pause : (sync.error ? S.retry : S.resume));
         } else {
@@ -849,10 +852,44 @@
         }
     }
 
+    // A batch ChatMaxima turned away for now (rate limit) or that never arrived (network): wait, then send it again.
+    // After SYNC_MAX_RETRIES failed waits in a row the sync pauses with the error, as any other failure does.
+    var SYNC_MAX_RETRIES = 3;
+    var syncWaitTimer = null;
+
+    function syncWaitText() {
+        return fmt(ui.sync.waitKind === 'RATE_LIMITED' ? S.syncSlowDown : S.syncReconnect, ui.sync.wait);
+    }
+
+    function waitThenResume(seconds, kind) {
+        ui.sync.wait = seconds;
+        ui.sync.waitKind = kind;
+        renderSyncBox();
+        clearInterval(syncWaitTimer);
+        syncWaitTimer = setInterval(function () {
+            if (!ui.sync.running) { // paused by hand while waiting
+                clearInterval(syncWaitTimer);
+                ui.sync.wait = 0;
+                renderSyncBox();
+                return;
+            }
+            ui.sync.wait--;
+            if (ui.sync.wait <= 0) {
+                clearInterval(syncWaitTimer);
+                ui.sync.wait = 0;
+                renderSyncBox();
+                syncBatch();
+                return;
+            }
+            $('#cmw-sync-wait').text(syncWaitText());
+        }, 1000);
+    }
+
     function startSync() {
         if (!selectedCount()) {
             return;
         }
+        ui.sync.retries = 0;
         ensureKnowledgeSource().done(function () {
             if (ui.sync.done) {
                 ui.sync.done = false;
@@ -878,6 +915,7 @@
             return;
         }
         post('chatmaxima_sync_posts', { post_types: selectedTypes(), offset: ui.sync.offset }).done(function (data) {
+            ui.sync.retries = 0;
             ui.sync.total = data.total || 0;
             ui.sync.synced = data.synced || 0;
             ui.sync.offset = data.next_offset || data.synced || 0;
@@ -898,6 +936,13 @@
             renderSyncBox();
             syncBatch();
         }).fail(function (error) {
+            var retryable = error.code === 'RATE_LIMITED' || error.code === 'network';
+            if (retryable && ui.sync.running && ui.sync.retries < SYNC_MAX_RETRIES) {
+                ui.sync.retries++;
+                waitThenResume(error.code === 'RATE_LIMITED' ? 60 : 15, error.code);
+                return;
+            }
+            ui.sync.retries = 0;
             ui.sync.running = false;
             ui.sync.paused = true;
             ui.sync.error = error.message;

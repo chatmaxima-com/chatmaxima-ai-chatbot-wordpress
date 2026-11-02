@@ -425,6 +425,11 @@ class ChatMaxima_Admin_Settings
             $this->send_limit_reached($offset, $total);
         }
 
+        if (is_wp_error($result) && $result->get_error_code() === 'RATE_LIMITED') // ChatMaxima asked to slow down: nothing failed, the page waits and sends this batch again
+        {
+            wp_send_json_error(['message' => $result->get_error_message(), 'code' => 'RATE_LIMITED']);
+        }
+
         if (is_wp_error($result))
         {
             $error_msg = $result->get_error_message();

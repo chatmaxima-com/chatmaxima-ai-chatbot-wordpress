@@ -1238,6 +1238,8 @@ class ChatMaxima_Setup_Wizard
             'syncKeepOpen' => __('Keep this tab open while it runs. If you leave, sync pauses and picks up where it stopped when you return.', 'chatmaxima-ai-chatbot'),
             'syncFailed' => __('A batch could not be synced:', 'chatmaxima-ai-chatbot'),
             'retry' => __('Retry', 'chatmaxima-ai-chatbot'),
+            'syncSlowDown' => __('ChatMaxima asked to slow down. Continuing in %s seconds...', 'chatmaxima-ai-chatbot'),
+            'syncReconnect' => __('Could not reach ChatMaxima. Trying again in %s seconds...', 'chatmaxima-ai-chatbot'),
             /* translators: 1: batch number, 2: number of batches */
             'batchOf' => __('Batch %1$s of %2$s', 'chatmaxima-ai-chatbot'),
             'continueUnlocks' => __('Continue unlocks when sync finishes', 'chatmaxima-ai-chatbot'),
