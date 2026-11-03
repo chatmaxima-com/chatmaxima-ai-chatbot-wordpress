@@ -430,6 +430,11 @@ class ChatMaxima_Admin_Settings
             wp_send_json_error(['message' => $result->get_error_message(), 'code' => 'RATE_LIMITED']);
         }
 
+        if (is_wp_error($result) && $result->get_error_code() === 'network') // ChatMaxima could not be reached: nothing failed, the page waits and sends this batch again
+        {
+            wp_send_json_error(['message' => $result->get_error_message(), 'code' => 'network']);
+        }
+
         if (is_wp_error($result))
         {
             $error_msg = $result->get_error_message();

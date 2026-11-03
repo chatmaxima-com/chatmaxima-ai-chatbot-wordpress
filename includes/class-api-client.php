@@ -494,6 +494,27 @@ class ChatMaxima_API_Client
     }
 
     /**
+     * Send one HTTP request. A read that fails on the network (timeout, TLS handshake, DNS) is tried once more,
+     * since a one-off blip between the site's host and ChatMaxima is the usual cause; a write is not repeated,
+     * so a create that reached ChatMaxima is never made twice. A failure comes back as code "network" with a
+     * plain message instead of the raw cURL text.
+     */
+    private function send_request($url, $args)
+    {
+        $response = wp_remote_request($url, $args);
+        if (is_wp_error($response) && $args['method'] === 'GET')
+        {
+            sleep(1); // let a brief network blip pass
+            $response = wp_remote_request($url, $args);
+        }
+        if (is_wp_error($response))
+        {
+            return new WP_Error('network', __('Could not reach ChatMaxima just now. Reload the page to try again.', 'chatmaxima-ai-chatbot'), ['detail' => $response->get_error_message()]);
+        }
+        return $response;
+    }
+
+    /**
      * Make HTTP request to ChatMaxima API
      */
     private function make_request($endpoint, $method = 'GET', $body = null, $require_auth = true, $timeout = 30)
@@ -525,7 +546,7 @@ class ChatMaxima_API_Client
             $args['body'] = wp_json_encode($body);
         }
 
-        $response = wp_remote_request($url, $args);
+        $response = $this->send_request($url, $args);
 
         if (is_wp_error($response))
         {
@@ -544,7 +565,7 @@ class ChatMaxima_API_Client
             {
                 // Retry the request with new token
                 $args['headers']['Authorization'] = 'Bearer ' . $this->access_token;
-                $response = wp_remote_request($url, $args);
+                $response = $this->send_request($url, $args);
 
                 if (is_wp_error($response))
                 {

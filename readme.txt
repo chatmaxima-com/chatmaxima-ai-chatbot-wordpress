@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.9
+Stable tag: 2.1.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.10 =
+* When ChatMaxima cannot be reached for a moment (a timeout between your host and ChatMaxima), Home tries once more and then shows a plain "Could not reach ChatMaxima" message instead of the raw cURL error. A sync waits 15 seconds and continues instead of marking the batch as failed.
+
 = 2.1.9 =
 * Sync keeps going when ChatMaxima asks it to slow down: it waits a minute (15 seconds after a connection problem), shows a countdown, and continues by itself. It pauses with a Retry button only after three waits in a row. Posts in a delayed batch are no longer marked as failed.
 
@@ -223,6 +226,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.10 =
+Friendlier handling of brief connection problems between your site and ChatMaxima.
 
 = 2.1.9 =
 Large syncs wait and continue by themselves when ChatMaxima asks them to slow down.
