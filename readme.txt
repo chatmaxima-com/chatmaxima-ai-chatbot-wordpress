@@ -4,7 +4,7 @@ Tags: chatbot, ai, customer support, live chat, whatsapp
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.10
+Stable tag: 2.1.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 
 == Changelog ==
 
+= 2.1.11 =
+* The "Check your email" step now says the verification code works for 60 minutes, the same as the email that carries it.
+
 = 2.1.10 =
 * When ChatMaxima cannot be reached for a moment (a timeout between your host and ChatMaxima), Home tries once more and then shows a plain "Could not reach ChatMaxima" message instead of the raw cURL error. A sync waits 15 seconds and continues instead of marking the batch as failed.
 
@@ -226,6 +229,9 @@ Data is sent to ChatMaxima only when you connect the plugin, sync content, or se
 * Token-based authentication
 
 == Upgrade Notice ==
+
+= 2.1.11 =
+The sign-up step now gives the same code lifetime as the verification email.
 
 = 2.1.10 =
 Friendlier handling of brief connection problems between your site and ChatMaxima.

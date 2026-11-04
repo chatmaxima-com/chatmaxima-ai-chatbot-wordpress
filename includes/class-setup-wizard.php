@@ -1179,7 +1179,7 @@ class ChatMaxima_Setup_Wizard
             'noSsl' => __('This admin page is not using HTTPS, so what you type here travels unencrypted to your own site. Switch WordPress to HTTPS before entering a password or an API key.', 'chatmaxima-ai-chatbot'),
             'verifyTitle' => __('Check your email', 'chatmaxima-ai-chatbot'),
             /* translators: %s: email address */
-            'verifyIntro' => __('We sent a 6-digit code to %s. Enter it below to activate your account. The code works for 3 hours.', 'chatmaxima-ai-chatbot'),
+            'verifyIntro' => __('We sent a 6-digit code to %s. Enter it below to activate your account. The code works for 60 minutes.', 'chatmaxima-ai-chatbot'),
             'verifyPending' => __('This account is waiting for its email code. Enter the code we sent, or send a new one.', 'chatmaxima-ai-chatbot'),
             'code' => __('Verification code', 'chatmaxima-ai-chatbot'),
             'verifyContinue' => __('Activate and continue', 'chatmaxima-ai-chatbot'),
